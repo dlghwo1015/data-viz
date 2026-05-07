@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S&amp;P 500 섹터 히트맵</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0a14; color: #e0e0f0; font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px; }
+h1 { text-align: center; font-size: 1.5em; color: #c0c0e0; letter-spacing: 2px; font-weight: 300; margin-bottom: 4px; }
+.meta { text-align: center; font-size: 0.72em; color: #555; margin-bottom: 12px; }
+.meta span { color: #888; }
+
+/* Controls */
+.controls { display: flex; justify-content: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.btn { padding: 5px 14px; border-radius: 20px; border: 1px solid #333; background: #1a1a2a; color: #aaa; cursor: pointer; font-size: 0.75em; transition: all 0.2s; }
+.btn:hover, .btn.active { background: #2a2a4a; border-color: #6060aa; color: #ddf; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.live-btn { border-color: #cc3333 !important; color: #ff8888 !important; }
+.live-btn:hover:not(:disabled) { background: #2a1a1a !important; border-color: #ff4444 !important; color: #ffaaaa !important; }
+.live-status { text-align: center; font-size: 0.68em; margin-bottom: 10px; min-height: 18px; color: #666; }
+.live-status.ok { color: #44aa66; }
+.live-status.err { color: #aa4444; }
+.api-info { text-align: center; font-size: 0.65em; color: #445; margin-bottom: 8px; }
+.api-info a { color: #558; text-decoration: none; }
+
+/* Legend */
+.legend { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 12px; font-size: 0.7em; color: #888; }
+.grad-bar { width: 200px; height: 12px; border-radius: 6px; background: linear-gradient(to right, #ff5050, #aa1a1a, #2a2a38, #0d7530, #26e870); }
+.leg-label { color: #777; }
+
+/* Chart */
+#chart { width: 100%; }
+svg { display: block; }
+
+/* Cells — stroke 제거, CSS hover 사용 */
+.node { cursor: pointer; }
+.node rect { shape-rendering: crispEdges; }
+.node:hover rect { filter: brightness(1.4) saturate(1.15); }
+.node text { pointer-events: none; }
+.sector-label { font-size: 10px; font-weight: 600; fill: rgba(255,255,255,0.65); text-anchor: middle; dominant-baseline: middle; pointer-events: none; letter-spacing: 0.8px; }
+.stock-sym { font-weight: 700; fill: rgba(255,255,255,0.95); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.stock-pct { fill: rgba(255,255,255,0.72); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+
+/* Tooltip */
+.tip { position: fixed; background: #1a1a30; border: 1px solid #444; border-radius: 8px; padding: 12px 16px; font-size: 0.82em; pointer-events: none; z-index: 100; max-width: 240px; display: none; }
+.tip h3 { font-size: 1em; margin-bottom: 4px; }
+.tip .sym-row { font-size: 1.4em; font-weight: 700; margin-bottom: 6px; }
+.tip table { border-collapse: collapse; width: 100%; }
+.tip td { padding: 2px 0; color: #aaa; }
+.tip td:last-child { color: #ddd; text-align: right; }
+.tip .pct { font-size: 1.1em; font-weight: 600; }
+.up { color: #00cc44 !important; }
+.dn { color: #ee3333 !important; }
+
+/* Stats bar */
+.stats { display: flex; gap: 20px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
+.stat { text-align: center; }
+.stat .val { font-size: 1.1em; font-weight: 600; }
+.stat .lbl { font-size: 0.65em; color: #666; }
+</style>
+</head>
+<body>
+<h1>📊 S&amp;P 500 섹터 히트맵</h1>
+<p class="meta">박스 크기 = 시가총액 | 색상 = 당일 등락률 | <span>데이터: 추정치 (실제 시세와 다를 수 있음)</span></p>
+
+<div class="controls" id="controls">
+  <button class="btn active" onclick="setSortBy('cap')">시가총액 순</button>
+  <button class="btn" onclick="setSortBy('chg')">등락률 순</button>
+  <button class="btn live-btn" id="live-btn" onclick="loadLiveData()">🔴 실시간 로드</button>
+</div>
+<div class="live-status" id="live-status">💡 실시간 로드 버튼을 누르면 Yahoo Finance 데이터로 업데이트됩니다</div>
+
+<div class="legend">
+  <span class="leg-label">-5%+</span>
+  <div class="grad-bar"></div>
+  <span class="leg-label">+5%+</span>
+</div>
+
+<div id="chart"></div>
+<div class="tip" id="tip"></div>
+
+<script>
+// S&P 500 data: [ticker, name, sector, marketCap (B USD), dailyChg (%) - simulated]
+// Market caps approximate as of 2025
+const rawData = [
+  // Information Technology
+  ['AAPL','Apple','정보기술',3100],
+  ['MSFT','Microsoft','정보기술',2850],
+  ['NVDA','Nvidia','정보기술',2950],
+  ['AVGO','Broadcom','정보기술',900],
+  ['ORCL','Oracle','정보기술',450],
+  ['CRM','Salesforce','정보기술',260],
+  ['ADBE','Adobe','정보기술',175],
+  ['ACN','Accenture','정보기술',210],
+  ['NOW','ServiceNow','정보기술',210],
+  ['AMD','AMD','정보기술',200],
+  ['PANW','Palo Alto','정보기술',125],
+  ['INTU','Intuit','정보기술',185],
+  ['QCOM','Qualcomm','정보기술',180],
+  ['TXN','Texas Instr','정보기술',155],
+  ['AMAT','Applied Mat','정보기술',155],
+  ['LRCX','Lam Research','정보기술',105],
+  ['KLAC','KLA Corp','정보기술',88],
+  ['MU','Micron','정보기술',110],
+  ['SNPS','Synopsys','정보기술',85],
+  ['CDNS','Cadence','정보기술',80],
+  ['INTC','Intel','정보기술',88],
+  ['ADI','Analog Dev','정보기술',105],
+  ['MRVL','Marvell','정보기술',72],
+  ['FTNT','Fortinet','정보기술',68],
+  ['MSI','Motorola Sol','정보기술',65],
+  ['IT','Gartner','정보기술',33],
+  ['GLW','Corning','정보기술',30],
+  ['HPQ','HP Inc','정보기술',28],
+  ['HPE','HP Enterprise','정보기술',25],
+  ['JNPR','Juniper','정보기술',12],
+  ['WDC','Western Dig','정보기술',19],
+  ['STX','Seagate','정보기술',16],
+
+  // Communication Services
+  ['GOOGL','Alphabet A','커뮤니케이션',1050],
+  ['GOOG','Alphabet C','커뮤니케이션',1050],
+  ['META','Meta','커뮤니케이션',1500],
+  ['NFLX','Netflix','커뮤니케이션',380],
+  ['TMUS','T-Mobile','커뮤니케이션',240],
+  ['DIS','Walt Disney','커뮤니케이션',175],
+  ['CMCSA','Comcast','커뮤니케이션',145],
+  ['VZ','Verizon','커뮤니케이션',165],
+  ['T','AT&T','커뮤니케이션',140],
+  ['CHTR','Charter','커뮤니케이션',42],
+  ['PINS','Pinterest','커뮤니케이션',15],
+  ['MTCH','Match Group','커뮤니케이션',8],
+  ['PARA','Paramount','커뮤니케이션',7],
+  ['WBD','Warner Bros','커뮤니케이션',24],
+  ['OMC','Omnicom','커뮤니케이션',16],
+  ['IPG','Interpublic','커뮤니케이션',10],
+
+  // Consumer Discretionary
+  ['AMZN','Amazon','소비재(임의)',2200],
+  ['TSLA','Tesla','소비재(임의)',800],
+  ['HD','Home Depot','소비재(임의)',355],
+  ['MCD','McDonald\'s','소비재(임의)',210],
+  ['NKE','Nike','소비재(임의)',100],
+  ['BKNG','Booking Hldg','소비재(임의)',150],
+  ['LOW','Lowe\'s','소비재(임의)',135],
+  ['SBUX','Starbucks','소비재(임의)',90],
+  ['TJX','TJX Cos','소비재(임의)',135],
+  ['CMG','Chipotle','소비재(임의)',72],
+  ['MAR','Marriott','소비재(임의)',70],
+  ['ROST','Ross Stores','소비재(임의)',50],
+  ['HLT','Hilton','소비재(임의)',55],
+  ['TGT','Target','소비재(임의)',50],
+  ['GM','General Motors','소비재(임의)',48],
+  ['F','Ford','소비재(임의)',42],
+  ['EBAY','eBay','소비재(임의)',26],
+  ['ETSY','Etsy','소비재(임의)',6],
+  ['DG','Dollar General','소비재(임의)',14],
+  ['DLTR','Dollar Tree','소비재(임의)',15],
+  ['BBY','Best Buy','소비재(임의)',7],
+  ['EXPE','Expedia','소비재(임의)',18],
+
+  // Consumer Staples
+  ['WMT','Walmart','소비재(필수)',720],
+  ['COST','Costco','소비재(필수)',380],
+  ['PG','P&G','소비재(필수)',355],
+  ['KO','Coca-Cola','소비재(필수)',280],
+  ['PEP','PepsiCo','소비재(필수)',200],
+  ['PM','Philip Morris','소비재(필수)',200],
+  ['MDLZ','Mondelez','소비재(필수)',75],
+  ['CL','Colgate','소비재(필수)',60],
+  ['KMB','Kimberly-Clark','소비재(필수)',42],
+  ['GIS','General Mills','소비재(필수)',30],
+  ['K','Kellanova','소비재(필수)',26],
+  ['MKC','McCormick','소비재(필수)',18],
+  ['SJM','JM Smucker','소비재(필수)',10],
+  ['CAG','Conagra','소비재(필수)',12],
+  ['HSY','Hershey','소비재(필수)',32],
+
+  // Financials
+  ['BRK.B','Berkshire','금융',940],
+  ['JPM','JPMorgan','금융',680],
+  ['V','Visa','금융',555],
+  ['MA','Mastercard','금융',440],
+  ['BAC','Bank of America','금융',310],
+  ['WFC','Wells Fargo','금융',240],
+  ['GS','Goldman Sachs','금융',180],
+  ['MS','Morgan Stanley','금융',175],
+  ['AXP','Amex','금융',200],
+  ['SPGI','S&P Global','금융',152],
+  ['BLK','BlackRock','금융',130],
+  ['C','Citigroup','금융',130],
+  ['SCHW','Charles Schwab','금융',130],
+  ['PGR','Progressive','금융',145],
+  ['CB','Chubb','금융',105],
+  ['MCO','Moody\'s','금융',82],
+  ['ICE','Intercontinental','금융',82],
+  ['CME','CME Group','금융',80],
+  ['PYPL','PayPal','금융',70],
+  ['AFL','Aflac','금융',50],
+  ['TRV','Travelers','금융',55],
+  ['ALL','Allstate','금융',45],
+  ['MET','MetLife','금융',55],
+  ['PRU','Prudential','금융',43],
+  ['SQ','Block','금융',30],
+  ['USB','US Bancorp','금융',60],
+  ['PNC','PNC Financial','금융',65],
+
+  // Healthcare
+  ['LLY','Eli Lilly','헬스케어',750],
+  ['UNH','UnitedHealth','헬스케어',495],
+  ['JNJ','J&J','헬스케어',370],
+  ['ABBV','AbbVie','헬스케어',305],
+  ['MRK','Merck','헬스케어',235],
+  ['ISRG','Intuitive Surg','헬스케어',165],
+  ['TMO','Thermo Fisher','헬스케어',170],
+  ['DHR','Danaher','헬스케어',150],
+  ['AMGN','Amgen','헬스케어',140],
+  ['PFE','Pfizer','헬스케어',140],
+  ['VRTX','Vertex','헬스케어',120],
+  ['BMY','Bristol-Myers','헬스케어',130],
+  ['GILD','Gilead','헬스케어',100],
+  ['REGN','Regeneron','헬스케어',80],
+  ['SYK','Stryker','헬스케어',100],
+  ['MDT','Medtronic','헬스케어',90],
+  ['CVS','CVS Health','헬스케어',72],
+  ['CI','Cigna','헬스케어',82],
+  ['ELV','Elevance','헬스케어',80],
+  ['HUM','Humana','헬스케어',40],
+  ['EW','Edwards Life','헬스케어',50],
+  ['BIIB','Biogen','헬스케어',30],
+  ['BDX','Becton Dicki','헬스케어',65],
+
+  // Industrials
+  ['GE','GE Aerospace','산업재',200],
+  ['CAT','Caterpillar','산업재',175],
+  ['RTX','Raytheon','산업재',105],
+  ['HON','Honeywell','산업재',130],
+  ['UNP','Union Pacific','산업재',140],
+  ['LMT','Lockheed Martin','산업재',120],
+  ['BA','Boeing','산업재',120],
+  ['DE','Deere','산업재',100],
+  ['ETN','Eaton','산업재',102],
+  ['UPS','UPS','산업재',90],
+  ['PH','Parker Hannifin','산업재',72],
+  ['ITW','IL Tool Works','산업재',65],
+  ['WM','Waste Mgmt','산업재',87],
+  ['GEV','GE Vernova','산업재',75],
+  ['EMR','Emerson','산업재',62],
+  ['RSG','Republic Svcs','산업재',62],
+  ['CTAS','Cintas','산업재',67],
+  ['FDX','FedEx','산업재',56],
+  ['CSX','CSX Corp','산업재',56],
+  ['NSC','Norfolk So','산업재',55],
+  ['MMM','3M','산업재',62],
+  ['TDG','TransDigm','산업재',55],
+  ['NOC','Northrop Grum','산업재',66],
+  ['GD','General Dyn','산업재',75],
+
+  // Energy
+  ['XOM','ExxonMobil','에너지',440],
+  ['CVX','Chevron','에너지',268],
+  ['COP','ConocoPhillips','에너지',112],
+  ['EOG','EOG Resources','에너지',70],
+  ['SLB','Schlumberger','에너지',58],
+  ['MPC','Marathon Pete','에너지',50],
+  ['VLO','Valero','에너지',46],
+  ['PSX','Phillips 66','에너지',52],
+  ['WMB','Williams Co','에너지',52],
+  ['KMI','Kinder Morgan','에너지',45],
+  ['DVN','Devon Energy','에너지',26],
+  ['OXY','Occidental','에너지',45],
+  ['HAL','Halliburton','에너지',25],
+  ['BKR','Baker Hughes','에너지',28],
+
+  // Real Estate
+  ['PLD','Prologis','리츠',88],
+  ['AMT','Amer Tower','리츠',80],
+  ['EQIX','Equinix','리츠',75],
+  ['WELL','Welltower','리츠',60],
+  ['PSA','Public Storage','리츠',50],
+  ['SPG','Simon Property','리츠',50],
+  ['DLR','Digital Realty','리츠',45],
+  ['O','Realty Income','리츠',45],
+  ['CCI','Crown Castle','리츠',45],
+  ['CBRE','CBRE Group','리츠',35],
+  ['EXR','Extra Space','리츠',30],
+  ['AVB','AvalonBay','리츠',28],
+  ['SBA','SBA Comm','리츠',22],
+
+  // Utilities
+  ['NEE','NextEra Energy','유틸리티',150],
+  ['DUK','Duke Energy','유틸리티',90],
+  ['SO','Southern Co','유틸리티',75],
+  ['SRE','Sempra','유틸리티',45],
+  ['AEP','Amer Elec Pow','유틸리티',45],
+  ['D','Dominion','유틸리티',40],
+  ['EXC','Exelon','유틸리티',40],
+  ['XEL','Xcel Energy','유틸리티',30],
+  ['WEC','WEC Energy','유틸리티',30],
+  ['ED','Con Edison','유틸리티',30],
+  ['ES','Eversource','유틸리티',18],
+  ['AWK','Amer Water','유틸리티',22],
+  ['AES','AES Corp','유틸리티',12],
+
+  // Materials
+  ['LIN','Linde','소재',200],
+  ['SHW','Sherwin-Williams','소재',82],
+  ['APD','Air Products','소재',58],
+  ['FCX','Freeport-McMoRan','소재',50],
+  ['NEM','Newmont','소재',44],
+  ['ECL','Ecolab','소재',58],
+  ['NUE','Nucor','소재',30],
+  ['VMC','Vulcan Mater','소재',30],
+  ['MLM','Martin Marietta','소재',28],
+  ['ALB','Albemarle','소재',10],
+  ['IP','International Paper','소재',20],
+  ['CF','CF Industries','소재',14],
+  ['MOS','Mosaic','소재',10],
+  ['PKG','Packaging Corp','소재',15],
+];
+
+// Simulate daily change with seeded pseudo-random
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return ((s >>> 0) / 0xffffffff) * 2 - 1;
+  };
+}
+
+const rand = seededRand(20250505);
+const data = rawData.map(([ticker, name, sector, cap]) => {
+  const r = rand();
+  // bias toward -2 to +3 range, more realistic
+  const chg = parseFloat((r * 4.5 - 0.5).toFixed(2));
+  return { ticker, name, sector, cap, chg };
+});
+
+// Group by sector
+const sectorOrder = ['정보기술','커뮤니케이션','소비재(임의)','소비재(필수)','금융','헬스케어','산업재','에너지','리츠','유틸리티','소재'];
+const sectorColors = {
+  '정보기술':'#1a3550',
+  '커뮤니케이션':'#1a2a50',
+  '소비재(임의)':'#3a1a50',
+  '소비재(필수)':'#501a3a',
+  '금융':'#503a1a',
+  '헬스케어':'#1a5030',
+  '산업재':'#303a50',
+  '에너지':'#503020',
+  '리츠':'#2a3a50',
+  '유틸리티':'#1a4040',
+  '소재':'#3a4020',
+};
+
+function pctColor(chg) {
+  if (chg >= 5) return '#26e870';
+  if (chg >= 3) return '#1dc455';
+  if (chg >= 1.5) return '#13993c';
+  if (chg >= 0.5) return '#0d7530';
+  if (chg >= -0.5) return '#2a2a38';
+  if (chg >= -1.5) return '#aa1a1a';
+  if (chg >= -3) return '#cc2828';
+  if (chg >= -5) return '#ee3838';
+  return '#ff5050';
+}
+
+let sortBy = 'cap';
+function setSortBy(v) {
+  sortBy = v;
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  render();
+}
+
+function render() {
+  const container = document.getElementById('chart');
+  container.innerHTML = '';
+  const W = container.clientWidth || window.innerWidth - 32;
+  const H = Math.max(520, window.innerHeight - 220);
+
+  const grouped = {};
+  sectorOrder.forEach(s => { grouped[s] = []; });
+  data.forEach(d => { if (grouped[d.sector]) grouped[d.sector].push(d); });
+
+  const hierData = {
+    name: 'root',
+    children: sectorOrder.map(s => ({
+      name: s,
+      children: grouped[s].sort((a,b) => sortBy === 'cap' ? b.cap - a.cap : Math.abs(b.chg) - Math.abs(a.chg))
+    })).filter(s => s.children.length > 0)
+  };
+
+  const root = d3.hierarchy(hierData)
+    .sum(d => d.children ? 0 : d.cap)
+    .sort((a,b) => b.value - a.value);
+
+  d3.treemap()
+    .size([W, H])
+    .paddingOuter(3)
+    .paddingTop(17)
+    .paddingInner(1)
+    .round(true)(root);
+
+  const svg = d3.select('#chart')
+    .append('svg')
+    .attr('width', W)
+    .attr('height', H)
+    .style('background', '#0a0a14');
+
+  // 텍스트 드롭 섀도 필터 (가독성 향상)
+  const defs = svg.append('defs');
+  const f = defs.append('filter').attr('id','tshadow').attr('x','-5%').attr('y','-5%').attr('width','110%').attr('height','110%');
+  f.append('feDropShadow').attr('dx',0).attr('dy',0).attr('stdDeviation',1.2).attr('flood-color','#000').attr('flood-opacity',0.8);
+
+  // Sector groups
+  const sectors = root.children || [];
+  sectors.forEach(sector => {
+    const bg = sectorColors[sector.data.name] || '#1a1a2a';
+    const sw = sector.x1 - sector.x0, sh = sector.y1 - sector.y0;
+    // 섹터 전체 배경
+    svg.append('rect')
+      .attr('x', sector.x0).attr('y', sector.y0)
+      .attr('width', sw).attr('height', sh)
+      .attr('fill', bg);
+    // 헤더 바 (반투명 어두운 띠)
+    svg.append('rect')
+      .attr('x', sector.x0).attr('y', sector.y0)
+      .attr('width', sw).attr('height', 16)
+      .attr('fill', 'rgba(0,0,0,0.4)');
+    // 섹터 라벨
+    svg.append('text')
+      .attr('x', sector.x0 + sw / 2)
+      .attr('y', sector.y0 + 8)
+      .attr('class', 'sector-label')
+      .text(sector.data.name.toUpperCase());
+  });
+
+  // Stock cells
+  const leaves = root.leaves();
+  const cell = svg.selectAll('.node')
+    .data(leaves)
+    .enter().append('g')
+    .attr('class', 'node')
+    .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  cell.append('rect')
+    .attr('width', d => Math.max(0, d.x1 - d.x0))
+    .attr('height', d => Math.max(0, d.y1 - d.y0))
+    .attr('fill', d => pctColor(d.data.chg))
+    .on('mousemove', function(event, d) {
+      const tip = document.getElementById('tip');
+      const sign = d.data.chg >= 0 ? '+' : '';
+      const cls = d.data.chg >= 0 ? 'up' : 'dn';
+      tip.innerHTML = `
+        <div class="sym-row">${d.data.ticker}</div>
+        <h3>${d.data.name}</h3>
+        <table>
+          <tr><td>섹터</td><td>${d.data.sector}</td></tr>
+          <tr><td>시가총액</td><td>$${d.data.cap.toLocaleString()}B</td></tr>
+          <tr><td>등락률</td><td class="pct ${cls}">${sign}${d.data.chg}%</td></tr>
+        </table>
+        <div style="margin-top:8px;font-size:0.75em;color:#556;text-align:center;">🔗 클릭 → Yahoo Finance</div>`;
+      tip.style.display = 'block';
+      const tipW = 220, tipH = 120;
+      const x = Math.min(event.clientX + 14, window.innerWidth - tipW - 20);
+      const y = Math.min(event.clientY - 14, window.innerHeight - tipH - 20);
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    })
+    .on('mouseleave', () => { document.getElementById('tip').style.display = 'none'; })
+    .on('click', function(event, d) {
+      event.stopPropagation();
+      const ticker = d.data.ticker.replace(/\s/g, '');
+      window.open('https://finance.yahoo.com/quote/' + ticker, '_blank');
+    })
+    .style('cursor', 'pointer');
+
+  // Text labels
+  cell.each(function(d) {
+    const w = d.x1 - d.x0, h = d.y1 - d.y0;
+    const g = d3.select(this);
+    if (w < 20 || h < 14) return;
+    const cy = h / 2;
+    // clipPath으로 텍스트 셀 영역 밖 넘침 방지
+    const clipId = `c${d.data.ticker.replace(/[^a-zA-Z0-9]/g,'')}`;
+    g.append('clipPath').attr('id', clipId)
+      .append('rect').attr('width', w).attr('height', h);
+
+    if (w >= 36 && h >= 26) {
+      const fs = Math.min(Math.max(Math.min(w,h) * 0.22, 9), 14);
+      g.append('text').attr('class', 'stock-sym')
+        .attr('x', w/2).attr('y', h >= 38 ? cy - 6 : cy)
+        .attr('font-size', fs)
+        .attr('clip-path', `url(#${clipId})`)
+        .attr('filter', 'url(#tshadow)')
+        .text(d.data.ticker);
+      if (h >= 38) {
+        const sign = d.data.chg >= 0 ? '+' : '';
+        g.append('text').attr('class', 'stock-pct')
+          .attr('x', w/2).attr('y', cy + 7)
+          .attr('font-size', Math.min(fs * 0.78, 10))
+          .attr('clip-path', `url(#${clipId})`)
+          .attr('filter', 'url(#tshadow)')
+          .text(`${sign}${d.data.chg}%`);
+      }
+    } else if (w >= 20 && h >= 14) {
+      const fs = Math.min(Math.max(Math.min(w,h) * 0.28, 7), 10);
+      g.append('text').attr('class', 'stock-sym')
+        .attr('x', w/2).attr('y', cy)
+        .attr('font-size', fs)
+        .attr('clip-path', `url(#${clipId})`)
+        .text(d.data.ticker.length > 4 ? d.data.ticker.slice(0,4) : d.data.ticker);
+    }
+  });
+}
+
+// ── 실시간 데이터 로드 (Yahoo Finance via CORS proxy) ──
+async function loadLiveData() {
+  const btn = document.getElementById('live-btn');
+  const status = document.getElementById('live-status');
+  btn.textContent = '⏳ 로딩 중...';
+  btn.disabled = true;
+  status.className = 'live-status';
+  status.textContent = '📡 Yahoo Finance에서 데이터를 가져오는 중...';
+
+  // Yahoo Finance ticker 변환 (특수 케이스)
+  const yahooMap = { 'BRK.B':'BRK-B', 'BRK.A':'BRK-A' };
+  const toYahoo = t => yahooMap[t] || t;
+
+  const tickers = data.map(d => toYahoo(d.ticker));
+  const BATCH = 80;
+  const PROXY = 'https://corsproxy.io/?';
+  const liveCache = {};
+  let success = 0;
+
+  try {
+    for (let i = 0; i < tickers.length; i += BATCH) {
+      const batch = tickers.slice(i, i + BATCH);
+      const apiUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketChangePercent,marketCap,regularMarketPrice`;
+      const resp = await fetch(PROXY + encodeURIComponent(apiUrl), {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      (json.quoteResponse?.result || []).forEach(q => {
+        liveCache[q.symbol] = {
+          chg: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)),
+          cap: q.marketCap ? q.marketCap / 1e9 : null,
+          price: q.regularMarketPrice
+        };
+        success++;
+      });
+      // 딜레이 (과도한 요청 방지)
+      if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 400));
+    }
+
+    // data 배열 업데이트
+    data.forEach(d => {
+      const yt = toYahoo(d.ticker);
+      if (liveCache[yt]) {
+        d.chg = liveCache[yt].chg;
+        if (liveCache[yt].cap && liveCache[yt].cap > 0) d.cap = liveCache[yt].cap;
+      }
+    });
+
+    render();
+    const now = new Date().toLocaleTimeString('ko-KR');
+    status.className = 'live-status ok';
+    status.textContent = `✅ ${now} 기준 실시간 데이터 (${success}개 종목 업데이트) · Yahoo Finance`;
+    btn.textContent = '🔄 새로고침';
+  } catch (err) {
+    console.error(err);
+    status.className = 'live-status err';
+    status.textContent = `⚠️ 데이터 로드 실패: ${err.message} — CORS 프록시가 불안정할 수 있습니다. 아래 대안 참고.`;
+    btn.textContent = '🔴 재시도';
+  }
+  btn.disabled = false;
+}
+
+window.addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>

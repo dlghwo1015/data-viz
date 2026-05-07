@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🇰🇷 KOSPI 200 히트맵</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0a14; color: #e0e0f0; font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px; }
+h1 { text-align: center; font-size: 1.45em; color: #c0c0e0; letter-spacing: 2px; font-weight: 300; margin-bottom: 4px; }
+.meta { text-align: center; font-size: 0.7em; color: #555; margin-bottom: 14px; }
+.meta span { color: #888; }
+.live-row { display: flex; justify-content: center; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.live-btn { padding: 6px 18px; border-radius: 20px; border: 1px solid #cc3333; background: #1a1010; color: #ff8888; cursor: pointer; font-size: 0.75em; transition: all 0.2s; }
+.live-btn:hover:not(:disabled) { background: #2a1515; border-color: #ff5555; color: #ffaaaa; }
+.live-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.live-status { text-align: center; font-size: 0.67em; min-height: 18px; margin-bottom: 8px; color: #555; }
+.live-status.ok { color: #44aa66; }
+.live-status.err { color: #aa4444; }
+.legend { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 10px; font-size: 0.7em; color: #888; }
+.grad-bar { width: 180px; height: 10px; border-radius: 5px; background: linear-gradient(to right, #ff5050, #aa1a1a, #2a2a38, #0d7530, #26e870); }
+#chart { width: 100%; }
+svg { display: block; }
+.node { cursor: pointer; }
+.node rect { shape-rendering: crispEdges; }
+.node:hover rect { filter: brightness(1.4) saturate(1.15); }
+.tip { position: fixed; background: #1a1a30; border: 1px solid #444; border-radius: 8px; padding: 12px 16px; font-size: 0.8em; pointer-events: none; z-index: 100; max-width: 250px; display: none; }
+.tip .t-sym { font-size: 1.3em; font-weight: 700; margin-bottom: 3px; }
+.tip .t-name { color: #aaa; margin-bottom: 8px; font-size: 0.9em; }
+.tip table { border-collapse: collapse; width: 100%; }
+.tip td { padding: 2px 0; color: #999; }
+.tip td:last-child { color: #ddd; text-align: right; }
+.up { color: #26e870 !important; }
+.dn { color: #ff5050 !important; }
+.sector-legend { display: flex; flex-wrap: wrap; gap: 5px 14px; justify-content: center; margin-bottom: 10px; font-size: 0.68em; }
+.sl { display: flex; align-items: center; gap: 4px; color: #999; }
+.sl-box { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+</head>
+<body>
+<h1>🇰🇷 KOSPI 200 히트맵</h1>
+<p class="meta">박스 크기 = 시가총액 | 색상 = 당일 등락률 | <span>클릭 → Yahoo Finance</span></p>
+<div class="legend">
+  <span>-5%+</span>
+  <div class="grad-bar"></div>
+  <span>+5%+</span>
+</div>
+<div class="live-row">
+  <button class="live-btn" id="live-btn" onclick="loadLiveData()">🔴 실시간 로드 (Yahoo Finance)</button>
+</div>
+<div class="live-status" id="live-status">💡 실시간 로드 버튼을 누르면 현재 시세로 업데이트됩니다</div>
+<div class="sector-legend" id="sector-legend"></div>
+<div id="chart"></div>
+<div class="tip" id="tip"></div>
+
+<script>
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return ((s >>> 0) / 0xffffffff) * 2 - 1;
+  };
+}
+
+function pctColor(chg) {
+  if (chg >= 5) return '#26e870';
+  if (chg >= 3) return '#1dc455';
+  if (chg >= 1.5) return '#13993c';
+  if (chg >= 0.5) return '#0d7530';
+  if (chg >= -0.5) return '#2a2a38';
+  if (chg >= -1.5) return '#aa1a1a';
+  if (chg >= -3) return '#cc2828';
+  if (chg >= -5) return '#ee3838';
+  return '#ff5050';
+}
+
+const kospiRaw = [
+  ['005930','삼성전자','반도체/IT',3000000],
+  ['000660','SK하이닉스','반도체/IT',1100000],
+  ['005380','현대차','자동차',500000],
+  ['000270','기아','자동차',400000],
+  ['035420','NAVER','인터넷/플랫폼',350000],
+  ['051910','LG화학','화학/소재',220000],
+  ['006400','삼성SDI','배터리',250000],
+  ['207940','삼성바이오로직스','헬스케어/바이오',600000],
+  ['068270','셀트리온','헬스케어/바이오',360000],
+  ['373220','LG에너지솔루션','배터리',700000],
+  ['003550','LG','지주/복합',160000],
+  ['086790','하나금융지주','금융',160000],
+  ['035720','카카오','인터넷/플랫폼',180000],
+  ['055550','신한지주','금융',200000],
+  ['105560','KB금융','금융',220000],
+  ['096770','SK이노베이션','에너지/화학',120000],
+  ['003490','대한항공','운송',80000],
+  ['066570','LG전자','가전/전자',120000],
+  ['028260','삼성물산','지주/복합',220000],
+  ['011200','HMM','운송',90000],
+  ['032830','삼성생명','보험/금융',130000],
+  ['030200','KT','통신',60000],
+  ['017670','SK텔레콤','통신',100000],
+  ['010140','삼성중공업','조선',60000],
+  ['042660','대우조선해양','조선',40000],
+  ['009150','삼성전기','반도체/IT',90000],
+  ['000810','삼성화재','보험/금융',80000],
+  ['036570','엔씨소프트','게임/엔터',55000],
+  ['259960','크래프톤','게임/엔터',90000],
+  ['018260','삼성에스디에스','IT서비스',70000],
+  ['047050','포스코홀딩스','철강/소재',250000],
+  ['012330','현대모비스','자동차',150000],
+  ['010950','S-Oil','에너지/화학',65000],
+  ['015760','한국전력','유틸리티',60000],
+  ['086280','현대글로비스','운송',60000],
+  ['316140','우리금융지주','금융',100000],
+  ['090430','아모레퍼시픽','소비재',60000],
+  ['000100','유한양행','헬스케어/바이오',45000],
+  ['003670','포스코퓨처엠','배터리',80000],
+  ['051900','LG생활건강','소비재',60000],
+  ['267250','HD현대중공업','조선',90000],
+  ['000720','현대건설','건설',45000],
+  ['033780','KT&G','소비재',80000],
+  ['005490','POSCO','철강/소재',150000],
+  ['097950','CJ제일제당','식품/소비재',35000],
+  ['001040','CJ','지주/복합',20000],
+  ['139480','이마트','유통/소비재',30000],
+  ['021240','코웨이','소비재',55000],
+  ['018880','한온시스템','자동차',30000],
+  ['180640','한화에어로스페이스','방산/항공',120000],
+  ['009830','한화솔루션','에너지/화학',45000],
+  ['011790','SKC','화학/소재',30000],
+  ['024110','기업은행','금융',50000],
+  ['000150','두산','지주/복합',30000],
+  ['028050','삼성엔지니어링','건설',35000],
+  ['326030','SK바이오팜','헬스케어/바이오',30000],
+  ['091990','셀트리온헬스케어','헬스케어/바이오',40000],
+  ['271560','오리온','식품/소비재',40000],
+  ['282330','BGF리테일','유통/소비재',20000],
+  ['000080','하이트진로','식품/소비재',18000],
+  ['011780','금호석유화학','화학/소재',28000],
+  ['036460','한국가스공사','유틸리티',25000],
+  ['004020','현대제철','철강/소재',28000],
+  ['034730','SK','지주/복합',110000],
+  ['012750','에스원','IT서비스',18000],
+  ['007070','GS리테일','유통/소비재',15000],
+  ['078930','GS홀딩스','에너지/화학',40000],
+];
+
+const r1 = seededRand(20250501);
+const kospiData = kospiRaw.map(([t,n,s,c]) => ({
+  ticker: t, name: n, sector: s,
+  cap: c / 1350,
+  chg: parseFloat((r1()*4.5 - 0.3).toFixed(2))
+}));
+
+const sectorColorMap = {
+  '반도체/IT':'#1a3550','자동차':'#503020','인터넷/플랫폼':'#1a2a50',
+  '배터리':'#2a4520','헬스케어/바이오':'#1a5030','금융':'#50401a',
+  '화학/소재':'#303a20','에너지/화학':'#50300a','운송':'#2a2a50',
+  '통신':'#1a3a50','조선':'#2a3a4a','IT서비스':'#201a50',
+  '철강/소재':'#3a3a2a','게임/엔터':'#4a1a4a','지주/복합':'#3a2a1a',
+  '소비재':'#4a2a2a','건설':'#3a3a20','유틸리티':'#1a4040',
+  '방산/항공':'#2a3050','보험/금융':'#504020','식품/소비재':'#3a2010',
+  '유통/소비재':'#3a201a','가전/전자':'#1a2a40',
+};
+
+function getSectorColor(s) { return sectorColorMap[s] || '#1a2a2a'; }
+
+function buildSectorLegend() {
+  const sectors = [...new Set(kospiData.map(d => d.sector))];
+  document.getElementById('sector-legend').innerHTML = sectors.map(s =>
+    `<div class="sl"><div class="sl-box" style="background:${getSectorColor(s)}"></div>${s}</div>`
+  ).join('');
+}
+
+function renderChart() {
+  const container = document.getElementById('chart');
+  container.innerHTML = '';
+  const W = container.clientWidth || window.innerWidth - 32;
+  const H = Math.max(520, window.innerHeight - 210);
+
+  const sectors = [...new Set(kospiData.map(d => d.sector))];
+  const hierData = {
+    name: 'root',
+    children: sectors.map(s => ({
+      name: s,
+      children: kospiData.filter(d => d.sector === s).sort((a,b) => b.cap - a.cap)
+    }))
+  };
+
+  const root = d3.hierarchy(hierData)
+    .sum(d => d.children ? 0 : Math.max(d.cap, 0.1))
+    .sort((a,b) => b.value - a.value);
+
+  d3.treemap().size([W, H]).paddingOuter(3).paddingTop(17).paddingInner(1).round(true)(root);
+
+  const svg = d3.select('#chart').append('svg')
+    .attr('width', W).attr('height', H)
+    .style('background', '#0a0a14');
+
+  const defs = svg.append('defs');
+  const f = defs.append('filter').attr('id','tshadow').attr('x','-5%').attr('y','-5%').attr('width','110%').attr('height','110%');
+  f.append('feDropShadow').attr('dx',0).attr('dy',0).attr('stdDeviation',1.2).attr('flood-color','#000').attr('flood-opacity',0.8);
+
+  (root.children || []).forEach(sec => {
+    const bg = getSectorColor(sec.data.name);
+    const sw = sec.x1-sec.x0, sh = sec.y1-sec.y0;
+    svg.append('rect').attr('x',sec.x0).attr('y',sec.y0).attr('width',sw).attr('height',sh).attr('fill',bg);
+    svg.append('rect').attr('x',sec.x0).attr('y',sec.y0).attr('width',sw).attr('height',16).attr('fill','rgba(0,0,0,0.4)');
+    svg.append('text')
+      .attr('x',sec.x0+sw/2).attr('y',sec.y0+8)
+      .attr('text-anchor','middle').attr('dominant-baseline','middle')
+      .attr('font-size','10px').attr('font-weight','600').attr('fill','rgba(255,255,255,0.65)')
+      .attr('pointer-events','none').text(sec.data.name.toUpperCase());
+  });
+
+  const cell = svg.selectAll('.node').data(root.leaves()).enter().append('g')
+    .attr('class','node').attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  cell.append('rect')
+    .attr('width', d => Math.max(0, d.x1-d.x0))
+    .attr('height', d => Math.max(0, d.y1-d.y0))
+    .attr('fill', d => pctColor(d.data.chg))
+    .on('mousemove', function(event, d) {
+      const tip = document.getElementById('tip');
+      const sign = d.data.chg >= 0 ? '+' : '';
+      const cls = d.data.chg >= 0 ? 'up' : 'dn';
+      tip.innerHTML = `
+        <div class="t-sym">${d.data.ticker}</div>
+        <div class="t-name">${d.data.name}</div>
+        <table>
+          <tr><td>섹터</td><td>${d.data.sector}</td></tr>
+          <tr><td>시가총액</td><td>~$${d.data.cap.toFixed(1)}B</td></tr>
+          <tr><td>등락률</td><td class="${cls}" style="font-weight:700">${sign}${d.data.chg}%</td></tr>
+        </table>
+        <div style="margin-top:8px;font-size:0.75em;color:#556;text-align:center;">🔗 클릭 → Yahoo Finance</div>`;
+      tip.style.display = 'block';
+      const x = Math.min(event.clientX+14, window.innerWidth-260);
+      const y = Math.min(event.clientY-14, window.innerHeight-150);
+      tip.style.left = x+'px'; tip.style.top = y+'px';
+    })
+    .on('mouseleave', () => { document.getElementById('tip').style.display = 'none'; })
+    .on('click', function(event, d) {
+      event.stopPropagation();
+      const ticker = d.data.ticker.padStart(6,'0') + '.KS';
+      window.open('https://finance.yahoo.com/quote/' + ticker, '_blank');
+    })
+    .style('cursor','pointer');
+
+  cell.each(function(d) {
+    const w = d.x1-d.x0, h = d.y1-d.y0;
+    if (w < 20 || h < 14) return;
+    const g = d3.select(this);
+    const fs = Math.min(Math.max(Math.min(w,h)*0.22, 8), 14);
+    const cy = h/2;
+    const cid = `ck${d.data.ticker}`;
+    g.append('clipPath').attr('id',cid).append('rect').attr('width',w).attr('height',h);
+
+    if (w >= 35 && h >= 26) {
+      g.append('text').attr('x',w/2).attr('y', h>=38 ? cy-6 : cy)
+        .attr('text-anchor','middle').attr('dominant-baseline','middle')
+        .attr('font-size',fs).attr('font-weight','700').attr('fill','rgba(255,255,255,0.95)')
+        .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
+        .text(d.data.name.slice(0,4));
+      if (h >= 38) {
+        const sign = d.data.chg >= 0 ? '+' : '';
+        g.append('text').attr('x',w/2).attr('y',cy+7)
+          .attr('text-anchor','middle').attr('dominant-baseline','middle')
+          .attr('font-size', Math.min(fs*0.78,10)).attr('fill','rgba(255,255,255,0.72)')
+          .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
+          .text(`${sign}${d.data.chg}%`);
+      }
+    } else {
+      g.append('text').attr('x',w/2).attr('y',cy)
+        .attr('text-anchor','middle').attr('dominant-baseline','middle')
+        .attr('font-size', Math.min(fs*0.85,10)).attr('font-weight','700').attr('fill','rgba(255,255,255,0.9)')
+        .attr('pointer-events','none').attr('clip-path',`url(#${cid})`)
+        .text(d.data.name.slice(0,2));
+    }
+  });
+}
+
+async function loadLiveData() {
+  const btn = document.getElementById('live-btn');
+  const status = document.getElementById('live-status');
+  btn.textContent = '⏳ 로딩 중...'; btn.disabled = true;
+  status.className = 'live-status';
+  status.textContent = '📡 Yahoo Finance에서 시세를 가져오는 중...';
+
+  const PROXY = 'https://corsproxy.io/?';
+  const tickers = kospiData.map(d => d.ticker.padStart(6,'0') + '.KS');
+  const liveCache = {};
+  let success = 0;
+
+  try {
+    for (let i = 0; i < tickers.length; i += 80) {
+      const batch = tickers.slice(i, i+80);
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketChangePercent,marketCap`;
+      const resp = await fetch(PROXY + encodeURIComponent(url), { headers: { 'Accept': 'application/json' } });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      (json.quoteResponse?.result || []).forEach(q => {
+        liveCache[q.symbol] = { chg: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)), cap: q.marketCap };
+        success++;
+      });
+      if (i+80 < tickers.length) await new Promise(r => setTimeout(r, 400));
+    }
+    kospiData.forEach((d, i) => {
+      const sym = tickers[i];
+      if (liveCache[sym]) {
+        d.chg = liveCache[sym].chg;
+        if (liveCache[sym].cap) d.cap = liveCache[sym].cap / 1350e9;
+      }
+    });
+    renderChart();
+    const now = new Date().toLocaleTimeString('ko-KR');
+    status.className = 'live-status ok';
+    status.textContent = `✅ ${now} 기준 실시간 데이터 (${success}개 종목) · Yahoo Finance`;
+    btn.textContent = '🔄 새로고침';
+  } catch (err) {
+    status.className = 'live-status err';
+    status.textContent = `⚠️ 로드 실패: ${err.message}`;
+    btn.textContent = '🔴 재시도';
+  }
+  btn.disabled = false;
+}
+
+buildSectorLegend();
+renderChart();
+window.addEventListener('resize', renderChart);
+</script>
+</body>
+</html>

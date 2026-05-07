@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>인터랙티브 주기율표</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0d0d1f; color: #e8e8ff; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding: 16px; min-height: 100vh; }
+h1 { text-align: center; font-size: 1.6em; margin-bottom: 4px; color: #c8c8ff; letter-spacing: 3px; font-weight: 300; }
+.subtitle { text-align: center; font-size: 0.75em; color: #666; margin-bottom: 14px; letter-spacing: 1px; }
+.table-wrap { overflow-x: auto; }
+.pt-grid {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(52px, 1fr));
+  grid-template-rows: repeat(10, auto);
+  gap: 2px;
+  min-width: 960px;
+}
+.el {
+  border-radius: 4px;
+  padding: 3px 2px 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: 1px solid transparent;
+  position: relative;
+  user-select: none;
+}
+.el:hover {
+  transform: scale(1.25);
+  z-index: 20;
+  border-color: rgba(255,255,255,0.6);
+  box-shadow: 0 0 16px rgba(255,255,255,0.25);
+}
+.el .z { font-size: 0.52em; color: rgba(255,255,255,0.65); line-height: 1.4; }
+.el .sym { font-size: 1.05em; font-weight: 700; line-height: 1.15; }
+.el .nm { font-size: 0.43em; color: rgba(255,255,255,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.el .ms { font-size: 0.42em; color: rgba(255,255,255,0.55); }
+.placeholder { border: 1px dashed #2a2a4a; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.6em; color: #44446a; }
+.gap-row { grid-column: 1/-1; height: 6px; }
+.series-label { grid-column: 1/4; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; font-size: 0.55em; color: #55557a; font-style: italic; }
+
+/* Category colors */
+.alkali     { background: #7a1f1f; }
+.alkaline   { background: #7a4a0a; }
+.trans      { background: #1a3d5c; }
+.post       { background: #1a4a3a; }
+.metalloid  { background: #2d4a1a; }
+.nonmetal   { background: #1a2a5c; }
+.halogen    { background: #4a1a5c; }
+.noble      { background: #1a4a55; }
+.lanthanide { background: #3d1a5c; }
+.actinide   { background: #4a2a0a; }
+.unknown-cat{ background: #2a2a3a; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 14px 0 10px; justify-content: center; }
+.leg { display: flex; align-items: center; gap: 4px; font-size: 0.72em; color: #aaa; }
+.leg-box { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+
+/* Modal */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; align-items: center; justify-content: center; }
+.overlay.show { display: flex; }
+.modal {
+  background: #13132a;
+  border: 1px solid #333;
+  border-radius: 14px;
+  padding: 28px;
+  max-width: 420px;
+  width: 92%;
+  position: relative;
+  animation: fadeIn 0.2s;
+}
+@keyframes fadeIn { from { opacity:0; transform: scale(0.9); } to { opacity:1; transform: scale(1); } }
+.modal-close { position: absolute; top: 14px; right: 18px; cursor: pointer; font-size: 1.4em; color: #666; line-height: 1; }
+.modal-close:hover { color: #fff; }
+.m-top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+.m-sym-box { width: 72px; height: 72px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.m-sym-box .z { font-size: 0.75em; color: rgba(255,255,255,0.65); }
+.m-sym-box .sym { font-size: 2em; font-weight: 700; }
+.m-sym-box .ms { font-size: 0.65em; color: rgba(255,255,255,0.6); }
+.m-info h2 { font-size: 1.3em; font-weight: 600; }
+.m-info .en { font-size: 0.85em; color: #888; margin-bottom: 4px; }
+.m-info .cat-label { font-size: 0.72em; padding: 2px 8px; border-radius: 10px; display: inline-block; }
+.m-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.m-prop { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; }
+.m-prop .pl { font-size: 0.65em; color: #777; margin-bottom: 2px; }
+.m-prop .pv { font-size: 0.92em; font-weight: 500; }
+.m-desc { margin-top: 14px; font-size: 0.82em; color: #999; line-height: 1.55; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; }
+
+/* State indicator */
+.state-solid   { color: #aad4ff; }
+.state-liquid  { color: #aaffcc; }
+.state-gas     { color: #ffddaa; }
+.state-unknown { color: #888; }
+</style>
+</head>
+<body>
+<h1>⚛ 인터랙티브 주기율표</h1>
+<p class="subtitle">원소를 클릭하면 상세 정보를 볼 수 있습니다</p>
+
+<div class="legend" id="legend"></div>
+<div class="table-wrap">
+  <div class="pt-grid" id="grid"></div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <span class="modal-close" onclick="document.getElementById('overlay').classList.remove('show')">✕</span>
+    <div class="m-top">
+      <div class="m-sym-box" id="m-box">
+        <span class="z" id="m-z"></span>
+        <span class="sym" id="m-sym"></span>
+        <span class="ms" id="m-ms"></span>
+      </div>
+      <div class="m-info">
+        <h2 id="m-name"></h2>
+        <div class="en" id="m-en"></div>
+        <span class="cat-label" id="m-cat"></span>
+      </div>
+    </div>
+    <div class="m-grid" id="m-grid"></div>
+    <div class="m-desc" id="m-desc"></div>
+  </div>
+</div>
+
+<script>
+const CATS = {
+  alkali:     { label: '알칼리 금속',     color: '#7a1f1f' },
+  alkaline:   { label: '알칼리 토금속',   color: '#7a4a0a' },
+  trans:      { label: '전이 금속',       color: '#1a3d5c' },
+  post:       { label: '전이 후 금속',    color: '#1a4a3a' },
+  metalloid:  { label: '준금속',          color: '#2d4a1a' },
+  nonmetal:   { label: '비금속',          color: '#1a2a5c' },
+  halogen:    { label: '할로젠',          color: '#4a1a5c' },
+  noble:      { label: '비활성 기체',     color: '#1a4a55' },
+  lanthanide: { label: '란타넘족',        color: '#3d1a5c' },
+  actinide:   { label: '악티늄족',        color: '#4a2a0a' },
+  'unknown-cat': { label: '미분류',       color: '#2a2a3a' },
+};
+
+// Z, sym, name_ko, name_en, mass, cat, group, period, eneg, melt, boil, state, desc
+const E = [
+  [1,'H','수소','Hydrogen','1.008','nonmetal',1,1,2.20,-259,-253,'gas','우주에서 가장 풍부한 원소. 우주 질량의 약 75%를 차지하며 연료전지의 핵심 에너지원'],
+  [2,'He','헬륨','Helium','4.003','noble',18,1,null,-272,-269,'gas','가장 가벼운 비활성 기체. 풍선과 냉각재로 사용. 절대 0도 근처에서도 액체 상태 유지'],
+  [3,'Li','리튬','Lithium','6.941','alkali',1,2,0.98,181,1342,'solid','가장 가벼운 금속 원소. 리튬이온 배터리의 핵심 소재'],
+  [4,'Be','베릴륨','Beryllium','9.012','alkaline',2,2,1.57,1287,2470,'solid','가볍고 단단한 독성 금속. 항공우주 합금에 사용'],
+  [5,'B','붕소','Boron','10.81','metalloid',13,2,2.04,2076,3927,'solid','반금속 성질. 붕산과 붕규산 유리의 원료'],
+  [6,'C','탄소','Carbon','12.01','nonmetal',14,2,2.55,3550,4027,'solid','생명의 기본 원소. 다이아몬드·흑연·그래핀 등 다양한 동소체 보유'],
+  [7,'N','질소','Nitrogen','14.01','nonmetal',15,2,3.04,-210,-196,'gas','대기의 78% 구성. 생명체 단백질·DNA의 필수 구성 원소'],
+  [8,'O','산소','Oxygen','16.00','nonmetal',16,2,3.44,-218,-183,'gas','대기의 21% 구성. 호흡과 연소에 필수적인 원소'],
+  [9,'F','플루오린','Fluorine','19.00','halogen',17,2,3.98,-220,-188,'gas','가장 강한 산화력을 가진 원소. 테플론의 원료'],
+  [10,'Ne','네온','Neon','20.18','noble',18,2,null,-249,-246,'gas','무색 비활성 기체. 네온사인에 사용시 붉은 빛 발산'],
+  [11,'Na','나트륨','Sodium','22.99','alkali',1,3,0.93,98,883,'solid','소금(NaCl)의 구성 원소. 신경 신호 전달에 필수'],
+  [12,'Mg','마그네슘','Magnesium','24.31','alkaline',2,3,1.31,650,1091,'solid','가벼운 구조용 금속. 엽록소의 중심 원소'],
+  [13,'Al','알루미늄','Aluminum','26.98','post',13,3,1.61,660,2519,'solid','지각에서 세 번째로 풍부한 원소. 가볍고 부식에 강한 금속'],
+  [14,'Si','규소','Silicon','28.09','metalloid',14,3,1.90,1414,3265,'solid','반도체의 핵심 소재. 지각의 27.7%를 차지'],
+  [15,'P','인','Phosphorus','30.97','nonmetal',15,3,2.19,44,281,'solid','DNA·RNA·ATP의 구성 원소. 비료의 핵심 성분'],
+  [16,'S','황','Sulfur','32.07','nonmetal',16,3,2.58,113,445,'solid','화산 근처에서 발견되는 노란 고체. 황산 제조의 원료'],
+  [17,'Cl','염소','Chlorine','35.45','halogen',17,3,3.16,-101,-34,'gas','살균·소독제로 사용. 소금(NaCl)의 구성 원소'],
+  [18,'Ar','아르곤','Argon','39.95','noble',18,3,null,-189,-186,'gas','대기의 0.93%. 용접 시 보호 가스로 사용'],
+  [19,'K','칼륨','Potassium','39.10','alkali',1,4,0.82,64,759,'solid','식물 생장 필수 원소. 신경·근육 기능 조절'],
+  [20,'Ca','칼슘','Calcium','40.08','alkaline',2,4,1.00,842,1484,'solid','뼈와 치아의 주성분. 지각에서 다섯 번째로 풍부'],
+  [21,'Sc','스칸듐','Scandium','44.96','trans',3,4,1.36,1541,2836,'solid','희토류 비슷한 성질. 항공우주 합금에 소량 사용'],
+  [22,'Ti','타이타늄','Titanium','47.87','trans',4,4,1.54,1668,3287,'solid','강도 높고 가벼운 금속. 의료·항공 분야에 광범위 사용'],
+  [23,'V','바나듐','Vanadium','50.94','trans',5,4,1.63,1910,3407,'solid','강철 합금에 사용. 레독스 흐름 배터리의 전해질'],
+  [24,'Cr','크로뮴','Chromium','52.00','trans',6,4,1.66,1907,2671,'solid','스테인리스 스틸의 핵심 성분. 금속 도금에 사용'],
+  [25,'Mn','망가니즈','Manganese','54.94','trans',7,4,1.55,1246,2061,'solid','철강 제조에 필수. 배터리 양극재 소재'],
+  [26,'Fe','철','Iron','55.85','trans',8,4,1.83,1538,2861,'solid','지구 핵의 주성분. 인류 문명의 핵심 금속 소재'],
+  [27,'Co','코발트','Cobalt','58.93','trans',9,4,1.88,1495,2927,'solid','배터리·자석·초합금의 핵심 소재. 파란 안료에 사용'],
+  [28,'Ni','니켈','Nickel','58.69','trans',10,4,1.91,1455,2913,'solid','합금·도금·배터리에 광범위 사용. 비자성 스테인리스'],
+  [29,'Cu','구리','Copper','63.55','trans',11,4,1.90,1085,2562,'solid','전기 전도성이 뛰어난 금속. 전선·배관·동전에 사용'],
+  [30,'Zn','아연','Zinc','65.38','trans',12,4,1.65,420,907,'solid','철의 방청 도금(아연도금)에 사용. 인체 필수 미네랄'],
+  [31,'Ga','갈륨','Gallium','69.72','post',13,4,1.81,30,2229,'solid','손바닥 열로 녹는 금속(녹는점 30°C). LED·반도체에 사용'],
+  [32,'Ge','저마늄','Germanium','72.63','metalloid',14,4,2.01,938,2833,'solid','초기 반도체 소재. 광섬유·적외선 광학에 사용'],
+  [33,'As','비소','Arsenic','74.92','metalloid',15,4,2.18,817,614,'solid','독성 준금속. 반도체(GaAs) 제조에 사용'],
+  [34,'Se','셀레늄','Selenium','78.97','nonmetal',16,4,2.55,221,685,'solid','광전지·복사기 드럼에 사용. 인체 미량 필수 원소'],
+  [35,'Br','브로민','Bromine','79.90','halogen',17,4,2.96,-7,59,'liquid','상온에서 액체인 두 원소 중 하나(나머지는 Hg). 방염제에 사용'],
+  [36,'Kr','크립톤','Krypton','83.80','noble',18,4,null,-157,-153,'gas','비활성 기체. 고성능 조명과 레이저에 사용'],
+  [37,'Rb','루비듐','Rubidium','85.47','alkali',1,5,0.82,39,688,'solid','매우 반응성 높은 알칼리 금속. 원자시계에 사용'],
+  [38,'Sr','스트론튬','Strontium','87.62','alkaline',2,5,0.95,777,1382,'solid','불꽃 반응시 진홍색. 뼈에 축적되어 방사성 동위원소 위험'],
+  [39,'Y','이트륨','Yttrium','88.91','trans',3,5,1.22,1522,3345,'solid','LED·레이저·초전도체에 사용. 희토류 광물에 동반 산출'],
+  [40,'Zr','지르코늄','Zirconium','91.22','trans',4,5,1.33,1855,4409,'solid','원자로 연료봉 피복재. 내열·내식성 우수'],
+  [41,'Nb','나이오븀','Niobium','92.91','trans',5,5,1.60,2477,4744,'solid','초전도 합금과 초전도 자석에 사용'],
+  [42,'Mo','몰리브데넘','Molybdenum','95.96','trans',6,5,2.16,2623,4639,'solid','강철 합금 첨가제. 효소의 보조인자로 생명에 필수'],
+  [43,'Tc','테크네튬','Technetium','(98)','trans',7,5,1.90,2157,4265,'solid','자연에 극미량 존재하는 방사성 원소. 핵의학 진단에 사용'],
+  [44,'Ru','루테늄','Ruthenium','101.1','trans',8,5,2.20,2334,4150,'solid','백금족 금속. 전자 저항기와 태양전지에 사용'],
+  [45,'Rh','로듐','Rhodium','102.9','trans',9,5,2.28,1964,3695,'solid','촉매 변환기(삼원촉매)의 핵심 소재. 매우 희귀'],
+  [46,'Pd','팔라듐','Palladium','106.4','trans',10,5,2.20,1555,2963,'solid','수소 흡착 능력 우수. 자동차 촉매·연료전지에 사용'],
+  [47,'Ag','은','Silver','107.9','trans',11,5,1.93,962,2162,'solid','전기 전도성 1위. 화폐·사진술·항균 소재로 사용'],
+  [48,'Cd','카드뮴','Cadmium','112.4','trans',12,5,1.69,321,767,'solid','독성 중금속. NiCd 배터리와 반도체(CdTe) 태양전지에 사용'],
+  [49,'In','인듐','Indium','114.8','post',13,5,1.78,157,2072,'solid','ITO(투명전극) 소재. 터치스크린·LCD 필수 원소'],
+  [50,'Sn','주석','Tin','118.7','post',14,5,1.96,232,2602,'solid','납땜·청동·도금에 사용. 음식 캔 코팅 소재'],
+  [51,'Sb','안티모니','Antimony','121.8','metalloid',15,5,2.05,631,1587,'solid','난연제와 반도체에 사용. 고대부터 화장품에 사용'],
+  [52,'Te','텔루륨','Tellurium','127.6','metalloid',16,5,2.10,450,988,'solid','CdTe 태양전지 소재. 열전 소자에 사용'],
+  [53,'I','아이오딘','Iodine','126.9','halogen',17,5,2.66,114,184,'solid','갑상선 호르몬의 구성 원소. 소독제로 사용'],
+  [54,'Xe','제논','Xenon','131.3','noble',18,5,null,-112,-108,'gas','이온 추진 로켓에 사용. 마취제 및 의료 영상에 활용'],
+  [55,'Cs','세슘','Cesium','132.9','alkali',1,6,0.79,28,671,'solid','가장 정확한 원자시계 원소. GPS·통신의 기준 주파수'],
+  [56,'Ba','바륨','Barium','137.3','alkaline',2,6,0.89,727,1897,'solid','X선 조영제(황산바륨)로 사용. 불꽃 반응시 초록색'],
+  [57,'La','란타넘','Lanthanum','138.9','lanthanide',null,6,1.10,920,3464,'solid','희토류 원소의 시작. 카메라 렌즈와 하이브리드 배터리에 사용'],
+  [58,'Ce','세륨','Cerium','140.1','lanthanide',null,6,1.12,798,3443,'solid','가장 풍부한 희토류. 자동차 촉매와 연마재에 사용'],
+  [59,'Pr','프라세오디뮴','Praseodymium','140.9','lanthanide',null,6,1.13,931,3520,'solid','강력한 영구자석(NdFeB) 합금 원소. 항공기 엔진에 사용'],
+  [60,'Nd','네오디뮴','Neodymium','144.2','lanthanide',null,6,1.14,1021,3074,'solid','세계 최강 영구자석 원소. 전기차·풍력발전기 핵심 소재'],
+  [61,'Pm','프로메튬','Promethium','(145)','lanthanide',null,6,1.13,1042,3000,'solid','자연에서 거의 발견되지 않는 방사성 원소. 핵전지에 사용'],
+  [62,'Sm','사마륨','Samarium','150.4','lanthanide',null,6,1.17,1072,1794,'solid','SmCo 자석 소재. 고온에서도 자성 유지'],
+  [63,'Eu','유로퓸','Europium','152.0','lanthanide',null,6,1.20,822,1597,'solid','형광 스크린의 적색·청색 발광 소재. 유로지폐 위조 방지'],
+  [64,'Gd','가돌리늄','Gadolinium','157.3','lanthanide',null,6,1.20,1313,3273,'solid','MRI 조영제의 핵심 성분. 뛰어난 중성자 흡수 능력'],
+  [65,'Tb','터븀','Terbium','158.9','lanthanide',null,6,1.20,1356,3230,'solid','녹색 형광체 소재. 메모리 합금(Terfenol-D)에 사용'],
+  [66,'Dy','디스프로슘','Dysprosium','162.5','lanthanide',null,6,1.22,1412,2567,'solid','NdFeB 자석의 고온 성능 향상 원소. 전기차 필수 소재'],
+  [67,'Ho','홀뮴','Holmium','164.9','lanthanide',null,6,1.23,1474,2700,'solid','최강 자성 원소 중 하나. 의료용 레이저에 사용'],
+  [68,'Er','어븀','Erbium','167.3','lanthanide',null,6,1.24,1529,2868,'solid','광섬유 증폭기(EDFA)의 핵심 소재. 분홍색 유리 착색'],
+  [69,'Tm','툴륨','Thulium','168.9','lanthanide',null,6,1.25,1545,1950,'solid','X선 발생 장치에 사용. 가장 희귀한 란타넘족 원소 중 하나'],
+  [70,'Yb','이터븀','Ytterbium','173.0','lanthanide',null,6,1.10,824,1196,'solid','광섬유 레이저와 원자시계에 사용'],
+  [71,'Lu','루테튬','Lutetium','175.0','lanthanide',null,6,1.27,1663,3402,'solid','PET 스캐너에 사용. 란타넘족 중 가장 단단한 금속'],
+  [72,'Hf','하프늄','Hafnium','178.5','trans',4,6,1.30,2233,4603,'solid','지르코늄과 성질 유사. 반도체 고유전체 게이트 절연막'],
+  [73,'Ta','탄탈럼','Tantalum','180.9','trans',5,6,1.50,3017,5458,'solid','전해 커패시터(스마트폰) 핵심 소재. 인체 친화적 금속'],
+  [74,'W','텅스텐','Tungsten','183.8','trans',6,6,2.36,3422,5555,'solid','가장 높은 녹는점(3422°C). 전구 필라멘트·절삭 공구에 사용'],
+  [75,'Re','레늄','Rhenium','186.2','trans',7,6,1.90,3186,5596,'solid','고온 초합금(항공기 엔진 터빈)에 사용. 가장 희귀 금속 중 하나'],
+  [76,'Os','오스뮴','Osmium','190.2','trans',8,6,2.20,3033,5012,'solid','가장 밀도 높은 원소(22.59 g/cm³). 만년필 펜촉에 사용'],
+  [77,'Ir','이리듐','Iridium','192.2','trans',9,6,2.20,2446,4428,'solid','6,600만년 전 K-Pg 경계층에서 발견. 산성에 가장 강한 금속'],
+  [78,'Pt','백금','Platinum','195.1','trans',10,6,2.28,1768,3825,'solid','귀금속·촉매·암 치료제. 수소연료전지 촉매로 각광'],
+  [79,'Au','금','Gold','197.0','trans',11,6,2.54,1064,2856,'solid','가장 전연성이 좋은 금속. 화폐·장식·전자접점에 사용'],
+  [80,'Hg','수은','Mercury','200.6','trans',12,6,2.00,-39,357,'liquid','상온 액체 금속. 온도계·형광등·아말감에 사용. 독성 주의'],
+  [81,'Tl','탈륨','Thallium','204.4','post',13,6,1.62,304,1473,'solid','독성 강한 금속. 적외선 감지기와 의료 영상에 사용'],
+  [82,'Pb','납','Lead','207.2','post',14,6,2.33,328,1749,'solid','오래된 배관·납축전지 소재. 방사선 차폐재로 사용'],
+  [83,'Bi','비스무트','Bismuth','209.0','post',15,6,2.02,271,1564,'solid','냉각 시 특유의 무지개빛 산화막. 독성 낮아 납 대체재'],
+  [84,'Po','폴로늄','Polonium','(209)','metalloid',16,6,2.00,254,962,'solid','방사성 원소. 퀴리 부인이 발견. 우주선 제전(帶電) 장치에 사용'],
+  [85,'At','아스타틴','Astatine','(210)','halogen',17,6,2.20,302,337,'solid','가장 희귀한 자연 원소 중 하나. 암 치료 방사성 의약품 연구'],
+  [86,'Rn','라돈','Radon','(222)','noble',18,6,null,-71,-62,'gas','무색 방사성 기체. 건축물 지하에서 자연 발생. 폐암 위험'],
+  [87,'Fr','프랑슘','Francium','(223)','alkali',1,7,0.70,27,677,'solid','가장 반응성 높은 알칼리 금속. 자연에 극미량 존재'],
+  [88,'Ra','라듐','Radium','(226)','alkaline',2,7,0.90,700,1737,'solid','방사성 원소. 퀴리 부인이 발견. 과거 야광 도료에 사용'],
+  [89,'Ac','악티늄','Actinium','(227)','actinide',null,7,1.10,1050,3200,'solid','강한 방사성. 악티늄족의 첫 번째 원소'],
+  [90,'Th','토륨','Thorium','232.0','actinide',null,7,1.30,1750,4788,'solid','차세대 원자로 연료 후보. 우라늄보다 3배 풍부'],
+  [91,'Pa','프로트악티늄','Protactinium','231.0','actinide',null,7,1.50,1572,4000,'solid','희귀 방사성 원소. 토륨-우라늄 연대 측정에 사용'],
+  [92,'U','우라늄','Uranium','238.0','actinide',null,7,1.38,1135,4131,'solid','원자력 발전의 연료. 열화우라늄 탄약에도 사용'],
+  [93,'Np','넵투늄','Neptunium','(237)','actinide',null,7,1.36,644,4000,'solid','플루토늄 생산 중 부산물로 생성. 우주선 중성자 검출기에 사용'],
+  [94,'Pu','플루토늄','Plutonium','(244)','actinide',null,7,1.28,640,3228,'solid','핵무기 및 원자력 발전 연료. 우주 탐사선 방사성 열원 전지'],
+  [95,'Am','아메리슘','Americium','(243)','actinide',null,7,1.30,1176,2011,'solid','화재 감지기(연기감지기)의 방사선 원으로 사용'],
+  [96,'Cm','퀴륨','Curium','(247)','actinide',null,7,1.30,1345,3110,'solid','퀴리 부부의 이름을 딴 원소. 우주 탐사선 전원에 사용'],
+  [97,'Bk','버클륨','Berkelium','(247)','actinide',null,7,1.30,986,null,'solid','버클리 연구소에서 발견. 실험실에서만 소량 합성'],
+  [98,'Cf','캘리포늄','Californium','(251)','actinide',null,7,1.30,900,null,'solid','중성자 발생원으로 암 치료 및 지하자원 탐사에 사용'],
+  [99,'Es','아인슈타이늄','Einsteinium','(252)','actinide',null,7,1.30,860,null,'solid','수소폭탄 실험에서 처음 발견. 아인슈타인을 기리는 원소'],
+  [100,'Fm','페르뮴','Fermium','(257)','actinide',null,7,1.30,1527,null,'solid','페르미를 기리는 원소. 핵폭발 잔해에서 발견'],
+  [101,'Md','멘델레븀','Mendelevium','(258)','actinide',null,7,1.30,827,null,'solid','주기율표 창시자 멘델레예프를 기리는 원소'],
+  [102,'No','노벨륨','Nobelium','(259)','actinide',null,7,1.30,827,null,'solid','알프레드 노벨을 기리는 원소. 사이클로트론으로 합성'],
+  [103,'Lr','로렌슘','Lawrencium','(266)','actinide',null,7,1.30,1627,null,'solid','사이클로트론 발명가 로런스를 기리는 원소'],
+  [104,'Rf','러더포듐','Rutherfordium','(267)','trans',4,7,null,2100,5500,'unknown-cat','러더퍼드를 기리는 초악티늄 원소. 핵반응으로만 합성'],
+  [105,'Db','더브늄','Dubnium','(268)','trans',5,7,null,null,null,'unknown-cat','두브나 연구소를 기리는 초악티늄 원소'],
+  [106,'Sg','시보귬','Seaborgium','(269)','trans',6,7,null,null,null,'unknown-cat','시보그를 기리는 초악티늄 원소'],
+  [107,'Bh','보륨','Bohrium','(270)','trans',7,7,null,null,null,'unknown-cat','닐스 보어를 기리는 초악티늄 원소'],
+  [108,'Hs','하슘','Hassium','(277)','trans',8,7,null,null,null,'unknown-cat','독일 헤세주를 기리는 원소'],
+  [109,'Mt','마이트너륨','Meitnerium','(278)','trans',9,7,null,null,null,'unknown-cat','리제 마이트너를 기리는 원소'],
+  [110,'Ds','다름슈타튬','Darmstadtium','(281)','trans',10,7,null,null,null,'unknown-cat','다름슈타트시를 기리는 원소'],
+  [111,'Rg','뢴트게늄','Roentgenium','(282)','trans',11,7,null,null,null,'unknown-cat','뢴트겐을 기리는 원소'],
+  [112,'Cn','코페르니슘','Copernicium','(285)','trans',12,7,null,null,null,'unknown-cat','코페르니쿠스를 기리는 원소'],
+  [113,'Nh','니호늄','Nihonium','(286)','post',13,7,null,null,null,'unknown-cat','일본(日本=니혼)에서 발견·명명한 원소'],
+  [114,'Fl','플레로븀','Flerovium','(289)','post',14,7,null,null,null,'unknown-cat','플레로프 핵연구소를 기리는 원소'],
+  [115,'Mc','모스코븀','Moscovium','(290)','post',15,7,null,null,null,'unknown-cat','모스크바주를 기리는 원소'],
+  [116,'Lv','리버모륨','Livermorium','(293)','post',16,7,null,null,null,'unknown-cat','리버모어 연구소를 기리는 원소'],
+  [117,'Ts','테네신','Tennessine','(294)','halogen',17,7,null,null,null,'unknown-cat','테네시주를 기리는 원소. 가장 최근 발견 할로젠족'],
+  [118,'Og','오가네손','Oganesson','(294)','noble',18,7,null,null,null,'unknown-cat','오가네시안을 기리는 원소. 현재까지 합성된 가장 무거운 원소'],
+];
+
+// Map: Z -> element
+const elMap = {};
+E.forEach(e => elMap[e[0]] = e);
+
+function catClass(cat) {
+  const map = { nonmetal:'nonmetal', noble:'noble', alkali:'alkali', alkaline:'alkaline',
+    trans:'trans', post:'post', metalloid:'metalloid', halogen:'halogen',
+    lanthanide:'lanthanide', actinide:'actinide', 'unknown-cat':'unknown-cat' };
+  return map[cat] || 'unknown-cat';
+}
+
+function makeEl(el, row, col) {
+  const [z, sym, nm, en, mass, cat, grp, per, eneg, melt, boil, state, desc] = el;
+  const div = document.createElement('div');
+  div.className = `el ${catClass(cat)}`;
+  div.style.gridColumn = col;
+  div.style.gridRow = row;
+  div.innerHTML = `<div class="z">${z}</div><div class="sym">${sym}</div><div class="nm">${nm}</div><div class="ms">${mass}</div>`;
+  div.addEventListener('click', () => showModal(el));
+  return div;
+}
+
+function showModal(el) {
+  const [z, sym, nm, en, mass, cat, grp, per, eneg, melt, boil, state, desc] = el;
+  const box = document.getElementById('m-box');
+  box.className = `m-sym-box ${catClass(cat)}`;
+  document.getElementById('m-z').textContent = z;
+  document.getElementById('m-sym').textContent = sym;
+  document.getElementById('m-ms').textContent = mass;
+  document.getElementById('m-name').textContent = nm;
+  document.getElementById('m-en').textContent = en;
+  const catEl = document.getElementById('m-cat');
+  catEl.textContent = CATS[cat]?.label || cat;
+  catEl.style.background = CATS[cat]?.color || '#333';
+  catEl.style.color = '#fff';
+
+  const stateKo = { solid:'고체', liquid:'액체', gas:'기체', 'unknown-cat':'미확인' };
+  const stateClass = { solid:'state-solid', liquid:'state-liquid', gas:'state-gas', 'unknown-cat':'state-unknown' };
+  const stateLabel = stateKo[state] || '미확인';
+
+  const props = [
+    ['원자번호', z],
+    ['원자량', mass],
+    ['족 (Group)', grp || '-'],
+    ['주기 (Period)', per],
+    ['전기음성도', eneg ?? '-'],
+    ['녹는점', melt != null ? `${melt} °C` : '-'],
+    ['끓는점', boil != null ? `${boil} °C` : '-'],
+    ['상온 상태', stateLabel],
+  ];
+
+  const grid = document.getElementById('m-grid');
+  grid.innerHTML = props.map(([l, v]) =>
+    `<div class="m-prop"><div class="pl">${l}</div><div class="pv">${v}</div></div>`
+  ).join('');
+
+  document.getElementById('m-desc').textContent = desc;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('overlay')) {
+    document.getElementById('overlay').classList.remove('show');
+  }
+}
+
+// Build legend
+const legendDiv = document.getElementById('legend');
+Object.entries(CATS).forEach(([key, val]) => {
+  if (key === 'unknown-cat') return;
+  const item = document.createElement('div');
+  item.className = 'leg';
+  item.innerHTML = `<div class="leg-box" style="background:${val.color}"></div><span>${val.label}</span>`;
+  legendDiv.appendChild(item);
+});
+
+// Build grid
+const grid = document.getElementById('grid');
+
+// Helper to add empty cell
+function addBlank(row, col, cls='') {
+  const d = document.createElement('div');
+  d.style.gridColumn = col;
+  d.style.gridRow = row;
+  if (cls) d.className = cls;
+  grid.appendChild(d);
+}
+
+function addPlaceholder(row, col, text) {
+  const d = document.createElement('div');
+  d.className = 'placeholder';
+  d.style.gridColumn = col;
+  d.style.gridRow = row;
+  d.textContent = text;
+  grid.appendChild(d);
+}
+
+// Place elements that have fixed group/period
+E.forEach(el => {
+  const [z, sym, nm, en, mass, cat, grp, per] = el;
+  if (grp === null) return; // lanthanides/actinides - placed separately
+  grid.appendChild(makeEl(el, per, grp));
+});
+
+// Placeholder for lanthanides in row 6 col 3
+addPlaceholder(6, 3, '57-71');
+// Placeholder for actinides in row 7 col 3
+addPlaceholder(7, 3, '89-103');
+
+// Gap row (row 8)
+const gap = document.createElement('div');
+gap.className = 'gap-row';
+gap.style.gridRow = 8;
+gap.style.gridColumn = '1/-1';
+grid.appendChild(gap);
+
+// Lanthanide series label row 9 col 1-3
+const lLabel = document.createElement('div');
+lLabel.className = 'series-label';
+lLabel.style.gridRow = 9;
+lLabel.style.gridColumn = '1/4';
+lLabel.textContent = '란타넘족 →';
+grid.appendChild(lLabel);
+
+// Actinide series label row 10 col 1-3
+const aLabel = document.createElement('div');
+aLabel.className = 'series-label';
+aLabel.style.gridRow = 10;
+aLabel.style.gridColumn = '1/4';
+aLabel.textContent = '악티늄족 →';
+grid.appendChild(aLabel);
+
+// Place lanthanides Z=57-71 in row 9, cols 4-18
+const lanthanides = E.filter(e => e[0] >= 57 && e[0] <= 71);
+lanthanides.forEach((el, i) => {
+  grid.appendChild(makeEl(el, 9, 4 + i));
+});
+
+// Place actinides Z=89-103 in row 10, cols 4-18
+const actinides = E.filter(e => e[0] >= 89 && e[0] <= 103);
+actinides.forEach((el, i) => {
+  grid.appendChild(makeEl(el, 10, 4 + i));
+});
+
+// Keyboard close
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('overlay').classList.remove('show');
+});
+</script>
+</body>
+</html>

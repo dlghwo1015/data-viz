@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>니케이 225 히트맵</title>
+<title>🇯🇵 니케이 225 히트맵</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -39,7 +39,7 @@ svg { display: block; }
 </style>
 </head>
 <body>
-<h1>니케이 225 히트맵</h1>
+<h1>🇯🇵 니케이 225 히트맵</h1>
 <p class="meta">박스 크기 = 시가총액 | 색상 = 당일 등락률 | <span>클릭 → Yahoo Finance</span></p>
 <div class="legend">
   <span>-5%+</span>
@@ -47,24 +47,308 @@ svg { display: block; }
   <span>+5%+</span>
 </div>
 <div class="live-row">
-  <button class="live-btn" id="live-btn" onclick="loadLiveData()">실시간 로드 (Yahoo Finance)</button>
+  <button class="live-btn" id="live-btn" onclick="loadLiveData()">🔴 실시간 로드 (Yahoo Finance)</button>
 </div>
-<div class="live-status" id="live-status">실시간 로드 버튼을 누르면 현재 시세로 업데이트됩니다</div>
+<div class="live-status" id="live-status">💡 실시간 로드 버튼을 누르면 현재 시세로 업데이트됩니다</div>
 <div class="sector-legend" id="sector-legend"></div>
 <div id="chart"></div>
 <div class="tip" id="tip"></div>
+
 <script>
-function seededRand(seed){let s=seed;return function(){s=(s*1664525+1013904223)&0xffffffff;return((s>>>0)/0xffffffff)*2-1;};}
-function pctColor(chg){if(chg>=5)return'#26e870';if(chg>=3)return'#1dc455';if(chg>=1.5)return'#13993c';if(chg>=0.5)return'#0d7530';if(chg>=-0.5)return'#2a2a38';if(chg>=-1.5)return'#aa1a1a';if(chg>=-3)return'#cc2828';if(chg>=-5)return'#ee3838';return'#ff5050';}
-const nikkeiRaw=[['7203','Toyota Motor','자동차',50],['6758','Sony Group','전자/엔터',20],['8306','三菱UFJ FG','금융',25],['9984','SoftBank Group','IT/통신',15],['6861','Keyence','정밀기기',18],['9983','Fast Retailing','소매',18],['8035','Tokyo Electron','반도체장비',16],['4063','Shin-Etsu Chem','화학',17],['7974','Nintendo','게임/엔터',18],['9432','NTT','통신',18],['8316','Sumitomo Mitsui','금융',17],['4568','Daiichi Sankyo','제약/헬스케어',14],['6367','Daikin Indus','공조/산업재',9],['9433','KDDI','통신',10],['6098','Recruit Holdings','HR/IT',12],['4519','Chugai Pharma','제약/헬스케어',10],['4661','Oriental Land','소비/엔터',9],['4523','Eisai','제약/헬스케어',5],['7267','Honda Motor','자동차',9],['6502','Toshiba','전자/산업재',3],['6954','Fanuc','로봇/산업재',9],['6501','Hitachi','산업재/IT',13],['7751','Canon','정밀기기',4],['6594','Nidec','전기/모터',4],['4543','Terumo','의료기기',6],['8058','Mitsubishi Corp','종합상사',12],['8031','Mitsui & Co','종합상사',10],['8001','Itochu Corp','종합상사',10],['8002','Marubeni','종합상사',6],['8053','Sumitomo Corp','종합상사',6],['9022','JR Central','운송',7],['9020','JR East','운송',5],['2914','Japan Tobacco','소비재',9],['4503','Astellas Pharma','제약/헬스케어',5],['4902','Konica Minolta','전자/정밀',1],['5108','Bridgestone','자동차부품',9],['7270','Subaru','자동차',5],['7201','Nissan Motor','자동차',4],['4151','Kyowa Kirin','제약/헬스케어',5],['3382','Seven & i','유통/소비재',9],['2802','Ajinomoto','식품/소비재',4],['4901','Fujifilm Hldg','정밀기기/헬스케어',5],['6301','Komatsu','건설기계/산업재',6],['7011','Mitsubishi Heavy','방산/산업재',9],['1925','Daiwa House','부동산/건설',6],['8801','Mitsui Fudosan','부동산',6],['8802','Mitsubishi Estate','부동산',5],['5020','ENEOS Hldg','에너지',4],['5101','Yokohama Rubber','자동차부품',3],['7733','Olympus','정밀기기/의료',6],['4755','Rakuten Group','IT/EC',2],['9766','Konami','게임/엔터',4],['6762','TDK Corp','전자부품',6],['6976','Murata Mfg','전자부품',6],['6857','Advantest','반도체장비',6],['4452','Kao Corp','소비재',6],['3659','Nexon','게임/엔터',3],['9613','NTT Data','IT서비스',3],['8591','ORIX','금융',4],['8411','Mizuho Financial','금융',9],['8766','Tokio Marine','보험/금융',10],['6770','Alps Alpine','전자부품',1],['9101','NYK Line','해운',3],['3401','Teijin','화학',1]];
-const r2=seededRand(20250502);
-const nikkeiData=nikkeiRaw.map(([t,n,s,c])=>({ticker:t,name:n,sector:s,cap:c,capJPY:c,chg:parseFloat((r2()*4.5-0.3).toFixed(2))}));
-const sectorColorMap={'전자/엔터':'#1a2a50','정밀기기':'#253a45','IT/통신':'#1a1a50','반도체장비':'#103550','화학':'#2d4020','소매':'#402020','HR/IT':'#1a2540','전기/모터':'#252550','의료기기':'#103a25','종합상사':'#3a2a0a','공조/산업재':'#2a3a3a','로봇/산업재':'#2a2a40','산업재/IT':'#252535','제약/헬스케어':'#0a4030','소비/엔터':'#402a20','전자/산업재':'#252540','자동차부품':'#3a2a0a','전자/정밀':'#253040','전자부품':'#1a3040','건설기계/산업재':'#303a20','방산/산업재':'#2a3050','부동산/건설':'#3a2515','부동산':'#3a1a15','에너지':'#4a2a10','정밀기기/의료':'#153a30','IT/EC':'#101a50','해운':'#152a4a','자동차':'#503020','금융':'#50401a','통신':'#1a3a50','게임/엔터':'#4a1a4a','운송':'#2a2a50','소비재':'#4a2a2a','유통/소비재':'#3a201a','식품/소비재':'#3a2010','IT서비스':'#201a50','보험/금융':'#504020'};
-function getSectorColor(s){return sectorColorMap[s]||'#1a2a2a';}
-function buildSectorLegend(){const sectors=[...new Set(nikkeiData.map(d=>d.sector))];document.getElementById('sector-legend').innerHTML=sectors.map(s=>'<div class="sl"><div class="sl-box" style="background:'+getSectorColor(s)+'"></div>'+s+'</div>').join('');}
-function renderChart(){const container=document.getElementById('chart');container.innerHTML='';const W=container.clientWidth||window.innerWidth-32;const H=Math.max(520,window.innerHeight-210);const sectors=[...new Set(nikkeiData.map(d=>d.sector))];const hierData={name:'root',children:sectors.map(s=>({name:s,children:nikkeiData.filter(d=>d.sector===s).sort((a,b)=>b.cap-a.cap)}))};const root=d3.hierarchy(hierData).sum(d=>d.children?0:Math.max(d.cap,0.1)).sort((a,b)=>b.value-a.value);d3.treemap().size([W,H]).paddingOuter(3).paddingTop(17).paddingInner(1).round(true)(root);const svg=d3.select('#chart').append('svg').attr('width',W).attr('height',H).style('background','#0a0a14');const defs=svg.append('defs');const f=defs.append('filter').attr('id','tshadow').attr('x','-5%').attr('y','-5%').attr('width','110%').attr('height','110%');f.append('feDropShadow').attr('dx',0).attr('dy',0).attr('stdDeviation',1.2).attr('flood-color','#000').attr('flood-opacity',0.8);(root.children||[]).forEach(sec=>{const bg=getSectorColor(sec.data.name);const sw=sec.x1-sec.x0,sh=sec.y1-sec.y0;svg.append('rect').attr('x',sec.x0).attr('y',sec.y0).attr('width',sw).attr('height',sh).attr('fill',bg);svg.append('rect').attr('x',sec.x0).attr('y',sec.y0).attr('width',sw).attr('height',16).attr('fill','rgba(0,0,0,0.4)');svg.append('text').attr('x',sec.x0+sw/2).attr('y',sec.y0+8).attr('text-anchor','middle').attr('dominant-baseline','middle').attr('font-size','10px').attr('font-weight','600').attr('fill','rgba(255,255,255,0.65)').attr('pointer-events','none').text(sec.data.name.toUpperCase());});const cell=svg.selectAll('.node').data(root.leaves()).enter().append('g').attr('class','node').attr('transform',d=>'translate('+d.x0+','+d.y0+')');cell.append('rect').attr('width',d=>Math.max(0,d.x1-d.x0)).attr('height',d=>Math.max(0,d.y1-d.y0)).attr('fill',d=>pctColor(d.data.chg)).on('mousemove',function(event,d){const tip=document.getElementById('tip');const sign=d.data.chg>=0?'+':'';const cls=d.data.chg>=0?'up':'dn';tip.innerHTML='<div class="t-sym">'+d.data.ticker+'.T</div><div class="t-name">'+d.data.name+'</div><table><tr><td>섹터</td><td>'+d.data.sector+'</td></tr><tr><td>시가총액</td><td>~&yen;'+d.data.capJPY.toFixed(1)+'兆円</td></tr><tr><td>등락률</td><td class="'+cls+'" style="font-weight:700">'+sign+d.data.chg+'%</td></tr></table><div style="margin-top:8px;font-size:0.75em;color:#556;text-align:center;">클릭 → Yahoo Finance</div>';tip.style.display='block';const x=Math.min(event.clientX+14,window.innerWidth-260);const y=Math.min(event.clientY-14,window.innerHeight-150);tip.style.left=x+'px';tip.style.top=y+'px';}).on('mouseleave',()=>{document.getElementById('tip').style.display='none';}).on('click',function(event,d){event.stopPropagation();window.open('https://finance.yahoo.com/quote/'+d.data.ticker+'.T','_blank');}).style('cursor','pointer');cell.each(function(d){const w=d.x1-d.x0,h=d.y1-d.y0;if(w<20||h<14)return;const g=d3.select(this);const fs=Math.min(Math.max(Math.min(w,h)*0.22,8),14);const cy=h/2;const cid='nk'+d.data.ticker;g.append('clipPath').attr('id',cid).append('rect').attr('width',w).attr('height',h);if(w>=35&&h>=26){g.append('text').attr('x',w/2).attr('y',h>=38?cy-6:cy).attr('text-anchor','middle').attr('dominant-baseline','middle').attr('font-size',fs).attr('font-weight','700').attr('fill','rgba(255,255,255,0.95)').attr('pointer-events','none').attr('clip-path','url(#'+cid+')').attr('filter','url(#tshadow)').text(d.data.ticker);if(h>=38){const sign=d.data.chg>=0?'+':'';g.append('text').attr('x',w/2).attr('y',cy+7).attr('text-anchor','middle').attr('dominant-baseline','middle').attr('font-size',Math.min(fs*0.78,10)).attr('fill','rgba(255,255,255,0.72)').attr('pointer-events','none').attr('clip-path','url(#'+cid+')').attr('filter','url(#tshadow)').text(sign+d.data.chg+'%');}}else{g.append('text').attr('x',w/2).attr('y',cy).attr('text-anchor','middle').attr('dominant-baseline','middle').attr('font-size',Math.min(fs*0.85,10)).attr('font-weight','700').attr('fill','rgba(255,255,255,0.9)').attr('pointer-events','none').attr('clip-path','url(#'+cid+')').text(d.data.ticker.slice(0,4));}});}
-async function loadLiveData(){const btn=document.getElementById('live-btn');const status=document.getElementById('live-status');btn.textContent='로딩 중...';btn.disabled=true;status.className='live-status';status.textContent='Yahoo Finance에서 시세를 가져오는 중...';const PROXY='https://corsproxy.io/?';const tickers=nikkeiData.map(d=>d.ticker+'.T');const liveCache={};let success=0;try{for(let i=0;i<tickers.length;i+=80){const batch=tickers.slice(i,i+80);const url='https://query1.finance.yahoo.com/v7/finance/quote?symbols='+batch.join(',')+'&fields=regularMarketChangePercent,marketCap';const resp=await fetch(PROXY+encodeURIComponent(url),{headers:{'Accept':'application/json'}});if(!resp.ok)throw new Error('HTTP '+resp.status);const json=await resp.json();(json.quoteResponse?.result||[]).forEach(q=>{liveCache[q.symbol]={chg:parseFloat((q.regularMarketChangePercent??0).toFixed(2)),cap:q.marketCap};success++;});if(i+80<tickers.length)await new Promise(r=>setTimeout(r,400));}nikkeiData.forEach((d,i)=>{const sym=tickers[i];if(liveCache[sym]){d.chg=liveCache[sym].chg;if(liveCache[sym].cap){d.capJPY=liveCache[sym].cap/1e12;d.cap=d.capJPY;}}});renderChart();const now=new Date().toLocaleTimeString('ko-KR');status.className='live-status ok';status.textContent=now+' 기준 실시간 데이터 ('+success+'개 종목) · Yahoo Finance';btn.textContent='새로고침';}catch(err){status.className='live-status err';status.textContent='로드 실패: '+err.message;btn.textContent='재시도';}btn.disabled=false;}
-buildSectorLegend();renderChart();window.addEventListener('resize',renderChart);
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return ((s >>> 0) / 0xffffffff) * 2 - 1;
+  };
+}
+
+function pctColor(chg) {
+  if (chg >= 5) return '#26e870';
+  if (chg >= 3) return '#1dc455';
+  if (chg >= 1.5) return '#13993c';
+  if (chg >= 0.5) return '#0d7530';
+  if (chg >= -0.5) return '#2a2a38';
+  if (chg >= -1.5) return '#aa1a1a';
+  if (chg >= -3) return '#cc2828';
+  if (chg >= -5) return '#ee3838';
+  return '#ff5050';
+}
+
+// 4번째 컬럼: 시가총액 (단위: 兆円, 조엔)
+const nikkeiRaw = [
+  ['7203','Toyota Motor','자동차',50],
+  ['6758','Sony Group','전자/엔터',20],
+  ['8306','三菱UFJ FG','금융',25],
+  ['9984','SoftBank Group','IT/통신',15],
+  ['6861','Keyence','정밀기기',18],
+  ['9983','Fast Retailing','소매',18],
+  ['8035','Tokyo Electron','반도체장비',16],
+  ['4063','Shin-Etsu Chem','화학',17],
+  ['7974','Nintendo','게임/엔터',18],
+  ['9432','NTT','통신',18],
+  ['8316','Sumitomo Mitsui','금융',17],
+  ['4568','Daiichi Sankyo','제약/헬스케어',14],
+  ['6367','Daikin Indus','공조/산업재',9],
+  ['9433','KDDI','통신',10],
+  ['6098','Recruit Holdings','HR/IT',12],
+  ['4519','Chugai Pharma','제약/헬스케어',10],
+  ['4661','Oriental Land','소비/엔터',9],
+  ['4523','Eisai','제약/헬스케어',5],
+  ['7267','Honda Motor','자동차',9],
+  ['6502','Toshiba','전자/산업재',3],
+  ['6954','Fanuc','로봇/산업재',9],
+  ['6501','Hitachi','산업재/IT',13],
+  ['7751','Canon','정밀기기',4],
+  ['6594','Nidec','전기/모터',4],
+  ['4543','Terumo','의료기기',6],
+  ['8058','Mitsubishi Corp','종합상사',12],
+  ['8031','Mitsui & Co','종합상사',10],
+  ['8001','Itochu Corp','종합상사',10],
+  ['8002','Marubeni','종합상사',6],
+  ['8053','Sumitomo Corp','종합상사',6],
+  ['9022','JR Central','운송',7],
+  ['9020','JR East','운송',5],
+  ['2914','Japan Tobacco','소비재',9],
+  ['4503','Astellas Pharma','제약/헬스케어',5],
+  ['4902','Konica Minolta','전자/정밀',1],
+  ['5108','Bridgestone','자동차부품',9],
+  ['7270','Subaru','자동차',5],
+  ['7201','Nissan Motor','자동차',4],
+  ['4151','Kyowa Kirin','제약/헬스케어',5],
+  ['3382','Seven & i','유통/소비재',9],
+  ['2802','Ajinomoto','식품/소비재',4],
+  ['4901','Fujifilm Hldg','정밀기기/헬스케어',5],
+  ['6301','Komatsu','건설기계/산업재',6],
+  ['7011','Mitsubishi Heavy','방산/산업재',9],
+  ['1925','Daiwa House','부동산/건설',6],
+  ['8801','Mitsui Fudosan','부동산',6],
+  ['8802','Mitsubishi Estate','부동산',5],
+  ['5020','ENEOS Hldg','에너지',4],
+  ['5101','Yokohama Rubber','자동차부품',3],
+  ['7733','Olympus','정밀기기/의료',6],
+  ['4755','Rakuten Group','IT/EC',2],
+  ['9766','Konami','게임/엔터',4],
+  ['6762','TDK Corp','전자부품',6],
+  ['6976','Murata Mfg','전자부품',6],
+  ['6857','Advantest','반도체장비',6],
+  ['4452','Kao Corp','소비재',6],
+  ['3659','Nexon','게임/엔터',3],
+  ['9613','NTT Data','IT서비스',3],
+  ['8591','ORIX','금융',4],
+  ['8411','Mizuho Financial','금융',9],
+  ['8766','Tokio Marine','보험/금융',10],
+  ['6770','Alps Alpine','전자부품',1],
+  ['9101','NYK Line','해운',3],
+  ['3401','Teijin','화학',1],
+];
+
+const r2 = seededRand(20250502);
+const nikkeiData = nikkeiRaw.map(([t,n,s,c]) => ({
+  ticker: t, name: n, sector: s,
+  cap: c,          // 兆円 단위 (트리맵 크기 비교용)
+  capJPY: c,       // 兆円 단위 (툴팁 표시용)
+  chg: parseFloat((r2()*4.5 - 0.3).toFixed(2)),
+  price: null
+}));
+
+const sectorColorMap = {
+  '전자/엔터':'#1a2a50','정밀기기':'#253a45','IT/통신':'#1a1a50',
+  '반도체장비':'#103550','화학':'#2d4020','소매':'#402020',
+  'HR/IT':'#1a2540','전기/모터':'#252550','의료기기':'#103a25',
+  '종합상사':'#3a2a0a','공조/산업재':'#2a3a3a','로봇/산업재':'#2a2a40',
+  '산업재/IT':'#252535','제약/헬스케어':'#0a4030','소비/엔터':'#402a20',
+  '전자/산업재':'#252540','자동차부품':'#3a2a0a','전자/정밀':'#253040',
+  '전자부품':'#1a3040','건설기계/산업재':'#303a20','방산/산업재':'#2a3050',
+  '부동산/건설':'#3a2515','부동산':'#3a1a15','에너지':'#4a2a10',
+  '정밀기기/의료':'#153a30','IT/EC':'#101a50','해운':'#152a4a',
+  '자동차':'#503020','금융':'#50401a','통신':'#1a3a50',
+  '게임/엔터':'#4a1a4a','운송':'#2a2a50','소비재':'#4a2a2a',
+  '유통/소비재':'#3a201a','식품/소비재':'#3a2010','IT서비스':'#201a50',
+  '보험/금융':'#504020',
+};
+
+function getSectorColor(s) { return sectorColorMap[s] || '#1a2a2a'; }
+
+function buildSectorLegend() {
+  const sectors = [...new Set(nikkeiData.map(d => d.sector))];
+  document.getElementById('sector-legend').innerHTML = sectors.map(s =>
+    `<div class="sl"><div class="sl-box" style="background:${getSectorColor(s)}"></div>${s}</div>`
+  ).join('');
+}
+
+function renderChart() {
+  const container = document.getElementById('chart');
+  container.innerHTML = '';
+  const W = container.clientWidth || window.innerWidth - 32;
+  const H = Math.max(520, window.innerHeight - 210);
+
+  const sectors = [...new Set(nikkeiData.map(d => d.sector))];
+  const hierData = {
+    name: 'root',
+    children: sectors.map(s => ({
+      name: s,
+      children: nikkeiData.filter(d => d.sector === s).sort((a,b) => b.cap - a.cap)
+    }))
+  };
+
+  const root = d3.hierarchy(hierData)
+    .sum(d => d.children ? 0 : Math.max(d.cap, 0.1))
+    .sort((a,b) => b.value - a.value);
+
+  d3.treemap().size([W, H]).paddingOuter(3).paddingTop(17).paddingInner(1).round(true)(root);
+
+  const svg = d3.select('#chart').append('svg')
+    .attr('width', W).attr('height', H)
+    .style('background', '#0a0a14');
+
+  const defs = svg.append('defs');
+  const f = defs.append('filter').attr('id','tshadow').attr('x','-5%').attr('y','-5%').attr('width','110%').attr('height','110%');
+  f.append('feDropShadow').attr('dx',0).attr('dy',0).attr('stdDeviation',1.2).attr('flood-color','#000').attr('flood-opacity',0.8);
+
+  (root.children || []).forEach(sec => {
+    const bg = getSectorColor(sec.data.name);
+    const sw = sec.x1-sec.x0, sh = sec.y1-sec.y0;
+    svg.append('rect').attr('x',sec.x0).attr('y',sec.y0).attr('width',sw).attr('height',sh).attr('fill',bg);
+    svg.append('rect').attr('x',sec.x0).attr('y',sec.y0).attr('width',sw).attr('height',16).attr('fill','rgba(0,0,0,0.4)');
+    svg.append('text')
+      .attr('x',sec.x0+sw/2).attr('y',sec.y0+8)
+      .attr('text-anchor','middle').attr('dominant-baseline','middle')
+      .attr('font-size','10px').attr('font-weight','600').attr('fill','rgba(255,255,255,0.65)')
+      .attr('pointer-events','none').text(sec.data.name.toUpperCase());
+  });
+
+  const cell = svg.selectAll('.node').data(root.leaves()).enter().append('g')
+    .attr('class','node').attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  cell.append('rect')
+    .attr('width', d => Math.max(0, d.x1-d.x0))
+    .attr('height', d => Math.max(0, d.y1-d.y0))
+    .attr('fill', d => pctColor(d.data.chg))
+    .on('mousemove', function(event, d) {
+      const tip = document.getElementById('tip');
+      const sign = d.data.chg >= 0 ? '+' : '';
+      const cls = d.data.chg >= 0 ? 'up' : 'dn';
+      tip.innerHTML = `
+        <div class="t-sym">${d.data.ticker}.T</div>
+        <div class="t-name">${d.data.name}</div>
+        <table>
+          <tr><td>섹터</td><td>${d.data.sector}</td></tr>
+          <tr><td>시가총액</td><td>~¥${d.data.capJPY.toFixed(1)}兆円</td></tr>
+          <tr><td>현재가</td><td>${d.data.price != null ? '¥' + d.data.price.toLocaleString() : '—'}</td></tr>
+          <tr><td>등락률</td><td class="${cls}" style="font-weight:700">${sign}${d.data.chg}%</td></tr>
+        </table>
+        <div style="margin-top:8px;font-size:0.75em;color:#556;text-align:center;">🔗 클릭 → Yahoo Finance</div>`;
+      tip.style.display = 'block';
+      const x = Math.min(event.clientX+14, window.innerWidth-260);
+      const y = Math.min(event.clientY-14, window.innerHeight-150);
+      tip.style.left = x+'px'; tip.style.top = y+'px';
+    })
+    .on('mouseleave', () => { document.getElementById('tip').style.display = 'none'; })
+    .on('click', function(event, d) {
+      event.stopPropagation();
+      window.open('https://finance.yahoo.com/quote/' + d.data.ticker + '.T', '_blank');
+    })
+    .style('cursor','pointer');
+
+  cell.each(function(d) {
+    const w = d.x1-d.x0, h = d.y1-d.y0;
+    if (w < 20 || h < 14) return;
+    const g = d3.select(this);
+    const fs = Math.min(Math.max(Math.min(w,h)*0.22, 8), 14);
+    const cy = h/2;
+    const cid = `nk${d.data.ticker}`;
+    g.append('clipPath').attr('id',cid).append('rect').attr('width',w).attr('height',h);
+
+    if (w >= 35 && h >= 26) {
+      g.append('text').attr('x',w/2).attr('y', h>=38 ? cy-6 : cy)
+        .attr('text-anchor','middle').attr('dominant-baseline','middle')
+        .attr('font-size',fs).attr('font-weight','700').attr('fill','rgba(255,255,255,0.95)')
+        .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
+        .text(d.data.ticker);
+      if (h >= 38) {
+        const sign = d.data.chg >= 0 ? '+' : '';
+        g.append('text').attr('x',w/2).attr('y',cy+7)
+          .attr('text-anchor','middle').attr('dominant-baseline','middle')
+          .attr('font-size', Math.min(fs*0.78,10)).attr('fill','rgba(255,255,255,0.72)')
+          .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
+          .text(`${sign}${d.data.chg}%`);
+      }
+    } else {
+      g.append('text').attr('x',w/2).attr('y',cy)
+        .attr('text-anchor','middle').attr('dominant-baseline','middle')
+        .attr('font-size', Math.min(fs*0.85,10)).attr('font-weight','700').attr('fill','rgba(255,255,255,0.9)')
+        .attr('pointer-events','none').attr('clip-path',`url(#${cid})`)
+        .text(d.data.ticker.slice(0,4));
+    }
+  });
+}
+
+async function loadLiveData() {
+  const btn = document.getElementById('live-btn');
+  const status = document.getElementById('live-status');
+  btn.textContent = '⏳ 로딩 중...'; btn.disabled = true;
+  status.className = 'live-status';
+  status.textContent = '📡 Yahoo Finance에서 시세를 가져오는 중...';
+
+  const PROXIES = [
+    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://thingproxy.freeboard.io/fetch/' + u,
+  ];
+  async function fetchJSON(apiUrl) {
+    let lastErr;
+    for (const mkProxy of PROXIES) {
+      try {
+        const resp = await fetch(mkProxy(apiUrl), { headers: { 'Accept': 'application/json' } });
+        if (resp.ok) return await resp.json();
+        lastErr = new Error('HTTP ' + resp.status);
+      } catch(e) { lastErr = e; }
+    }
+    throw lastErr || new Error('모든 프록시 실패');
+  }
+  const tickers = nikkeiData.map(d => d.ticker + '.T');
+  const liveCache = {};
+  let success = 0;
+
+  try {
+    for (let i = 0; i < tickers.length; i += 80) {
+      const batch = tickers.slice(i, i+80);
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketChangePercent,marketCap,regularMarketPrice`;
+      const json = await fetchJSON(url);
+      (json.quoteResponse?.result || []).forEach(q => {
+        liveCache[q.symbol] = { chg: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)), cap: q.marketCap, price: q.regularMarketPrice ?? null };
+        success++;
+      });
+      if (i+80 < tickers.length) await new Promise(r => setTimeout(r, 400));
+    }
+    nikkeiData.forEach((d, i) => {
+      const sym = tickers[i];
+      if (liveCache[sym]) {
+        d.chg = liveCache[sym].chg;
+        if (liveCache[sym].cap) {
+          d.capJPY = liveCache[sym].cap / 1e12;  // JPY → 兆円
+          d.cap = d.capJPY;
+        }
+        if (liveCache[sym].price != null) d.price = liveCache[sym].price;
+      }
+    });
+    renderChart();
+    const now = new Date().toLocaleTimeString('ko-KR');
+    status.className = 'live-status ok';
+    status.textContent = `✅ ${now} 기준 실시간 데이터 (${success}개 종목) · Yahoo Finance`;
+    btn.textContent = '🔄 새로고침';
+  } catch (err) {
+    status.className = 'live-status err';
+    status.textContent = `⚠️ 로드 실패: ${err.message}`;
+    btn.textContent = '🔴 재시도';
+  }
+  btn.disabled = false;
+}
+
+buildSectorLegend();
+renderChart();
+window.addEventListener('resize', renderChart);
 </script>
 </body>
 </html>

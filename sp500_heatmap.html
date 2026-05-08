@@ -7,31 +7,31 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 10px 16px; }
 h1 { text-align: center; font-size: 1.5em; color: #c0c0e0; letter-spacing: 2px; font-weight: 300; margin-bottom: 4px; }
-.meta { text-align: center; font-size: 0.72em; color: #555; margin-bottom: 12px; }
+.meta { text-align: center; font-size: 0.72em; color: #555; margin-bottom: 6px; }
 .meta span { color: #888; }
 
 /* Controls */
-.controls { display: flex; justify-content: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.controls { display: flex; justify-content: center; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
 .btn { padding: 5px 14px; border-radius: 20px; border: 1px solid #333; background: var(--bg2); color: #aaa; cursor: pointer; font-size: 0.75em; transition: all 0.2s; }
 .btn:hover, .btn.active { background: var(--bg3); border-color: #6060aa; color: #ddf; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .live-btn { border-color: #cc3333 !important; color: #ff8888 !important; }
 .live-btn:hover:not(:disabled) { background: #2a1a1a !important; border-color: #ff4444 !important; color: #ffaaaa !important; }
-.live-status { text-align: center; font-size: 0.68em; margin-bottom: 10px; min-height: 18px; color: #666; }
+.live-status { text-align: center; font-size: 0.68em; margin-bottom: 4px; min-height: 18px; color: #666; }
 .live-status.ok { color: #44aa66; }
 .live-status.err { color: #aa4444; }
-.api-info { text-align: center; font-size: 0.65em; color: #445; margin-bottom: 8px; }
+.api-info { text-align: center; font-size: 0.65em; color: #445; margin-bottom: 4px; }
 .api-info a { color: #558; text-decoration: none; }
 
 /* Legend */
-.legend { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 12px; font-size: 0.7em; color: #888; }
+.legend { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 5px; font-size: 0.7em; color: #888; }
 .grad-bar { width: 200px; height: 12px; border-radius: 6px; background: linear-gradient(to right, #ff5050, #aa1a1a, #2a2a38, #0d7530, #26e870); }
 .leg-label { color: #777; }
 
 /* Chart */
-#chart { width: 100%; }
+#chart { width: 100%; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 svg { display: block; }
 
 /* Cells — stroke 제거, CSS hover 사용 */
@@ -55,7 +55,7 @@ svg { display: block; }
 .dn { color: #ee3333 !important; }
 
 /* Stats bar */
-.stats { display: flex; gap: 20px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
+.stats { display: flex; gap: 20px; justify-content: center; margin-bottom: 5px; flex-wrap: wrap; }
 .stat { text-align: center; }
 .stat .val { font-size: 1.1em; font-weight: 600; }
 .stat .lbl { font-size: 0.65em; color: #666; }
@@ -471,7 +471,7 @@ function render() {
   const container = document.getElementById('chart');
   container.innerHTML = '';
   const W = container.clientWidth || window.innerWidth - 32;
-  const H = Math.max(520, window.innerHeight - 220);
+  const H = Math.max(520, window.innerHeight - 200);
 
   const grouped = {};
   sectorOrder.forEach(s => { grouped[s] = []; });

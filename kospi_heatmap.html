@@ -433,7 +433,7 @@ async function loadLiveData() {
       }
     });
 
-    render();
+    renderChart();
     const now = new Date().toLocaleTimeString('ko-KR');
     status.className = 'live-status ok';
     status.textContent = `✅ ${now} 기준 (${source}) · ${Object.keys(liveData).length}개 종목`;

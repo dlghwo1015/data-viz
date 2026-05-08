@@ -400,7 +400,7 @@ async function loadLiveData() {
       const BATCH = 20;
       const tmpCache = {};
       let ok = 0;
-      const syms = kospiData.map(d => d.symbol);
+      const syms = kospiData.map(d => d.ticker);
       for (let i = 0; i < syms.length; i += BATCH) {
         const batch = syms.slice(i, i + BATCH);
         const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${batch.join(',')}&range=1d&interval=1d`;
@@ -426,7 +426,7 @@ async function loadLiveData() {
     if (!liveData || Object.keys(liveData).length === 0) throw new Error('데이터를 가져올 수 없습니다');
 
     kospiData.forEach(d => {
-      const live = liveData[d.symbol];
+      const live = liveData[d.ticker];
       if (live) {
         if (live.chg   != null) d.chg   = live.chg;
         if (live.price != null) d.price = live.price;

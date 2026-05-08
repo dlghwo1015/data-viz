@@ -7,20 +7,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 10px 16px; }
 h1 { text-align: center; font-size: 1.45em; color: #c0c0e0; letter-spacing: 2px; font-weight: 300; margin-bottom: 4px; }
-.meta { text-align: center; font-size: 0.7em; color: #555; margin-bottom: 14px; }
+.meta { text-align: center; font-size: 0.7em; color: #555; margin-bottom: 6px; }
 .meta span { color: #888; }
-.live-row { display: flex; justify-content: center; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.live-row { display: flex; justify-content: center; gap: 10px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
 .live-btn { padding: 6px 18px; border-radius: 20px; border: 1px solid #cc3333; background: #1a1010; color: #ff8888; cursor: pointer; font-size: 0.75em; transition: all 0.2s; }
 .live-btn:hover:not(:disabled) { background: #2a1515; border-color: #ff5555; color: #ffaaaa; }
 .live-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.live-status { text-align: center; font-size: 0.67em; min-height: 18px; margin-bottom: 8px; color: #555; }
+.live-status { text-align: center; font-size: 0.67em; min-height: 18px; margin-bottom: 4px; color: #555; }
 .live-status.ok { color: #44aa66; }
 .live-status.err { color: #aa4444; }
-.legend { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 10px; font-size: 0.7em; color: #888; }
+.legend { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 5px; font-size: 0.7em; color: #888; }
 .grad-bar { width: 180px; height: 10px; border-radius: 5px; background: linear-gradient(to right, #ff5050, #aa1a1a, #2a2a38, #0d7530, #26e870); }
-#chart { width: 100%; }
+#chart { width: 100%; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 svg { display: block; }
 .node { cursor: pointer; }
 .node rect { shape-rendering: crispEdges; }
@@ -33,7 +33,7 @@ svg { display: block; }
 .tip td:last-child { color: var(--tip-td2); text-align: right; }
 .up { color: #26e870 !important; }
 .dn { color: #ff5050 !important; }
-.sector-legend { display: flex; flex-wrap: wrap; gap: 5px 14px; justify-content: center; margin-bottom: 10px; font-size: 0.68em; }
+.sector-legend { display: flex; flex-wrap: wrap; gap: 5px 14px; justify-content: center; margin-bottom: 5px; font-size: 0.68em; }
 .sl { display: flex; align-items: center; gap: 4px; color: #999; }
 .sl-box { width: 10px; height: 10px; border-radius: 2px; }
 
@@ -274,7 +274,7 @@ function renderChart() {
   const container = document.getElementById('chart');
   container.innerHTML = '';
   const W = container.clientWidth || window.innerWidth - 32;
-  const H = Math.max(520, window.innerHeight - 210);
+  const H = Math.max(520, window.innerHeight - 200);
 
   const sectors = [...new Set(nikkeiData.map(d => d.sector))];
   const hierData = {

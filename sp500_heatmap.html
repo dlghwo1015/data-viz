@@ -335,7 +335,7 @@ const data = rawData.map(([ticker, name, sector, cap]) => {
   const r = rand();
   // bias toward -2 to +3 range, more realistic
   const chg = parseFloat((r * 4.5 - 0.5).toFixed(2));
-  return { ticker, name, sector, cap, chg };
+  return { ticker, name, sector, cap, chg, price: null };
 });
 
 // Group by sector
@@ -459,6 +459,7 @@ function render() {
         <table>
           <tr><td>섹터</td><td>${d.data.sector}</td></tr>
           <tr><td>시가총액</td><td>$${d.data.cap.toLocaleString()}B</td></tr>
+          <tr><td>현재가</td><td>${d.data.price != null ? '$' + d.data.price.toFixed(2) : '—'}</td></tr>
           <tr><td>등락률</td><td class="pct ${cls}">${sign}${d.data.chg}%</td></tr>
         </table>
         <div style="margin-top:8px;font-size:0.75em;color:#556;text-align:center;">🔗 클릭 → Yahoo Finance</div>`;
@@ -531,7 +532,22 @@ async function loadLiveData() {
 
   const tickers = data.map(d => toYahoo(d.ticker));
   const BATCH = 80;
-  const PROXY = 'https://corsproxy.io/?';
+  const PROXIES = [
+    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://thingproxy.freeboard.io/fetch/' + u,
+  ];
+  async function fetchJSON(apiUrl) {
+    let lastErr;
+    for (const mkProxy of PROXIES) {
+      try {
+        const resp = await fetch(mkProxy(apiUrl), { headers: { 'Accept': 'application/json' } });
+        if (resp.ok) return await resp.json();
+        lastErr = new Error('HTTP ' + resp.status);
+      } catch(e) { lastErr = e; }
+    }
+    throw lastErr || new Error('모든 프록시 실패');
+  }
   const liveCache = {};
   let success = 0;
 
@@ -539,16 +555,12 @@ async function loadLiveData() {
     for (let i = 0; i < tickers.length; i += BATCH) {
       const batch = tickers.slice(i, i + BATCH);
       const apiUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketChangePercent,marketCap,regularMarketPrice`;
-      const resp = await fetch(PROXY + encodeURIComponent(apiUrl), {
-        headers: { 'Accept': 'application/json' }
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
+      const json = await fetchJSON(apiUrl);
       (json.quoteResponse?.result || []).forEach(q => {
         liveCache[q.symbol] = {
           chg: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)),
           cap: q.marketCap ? q.marketCap / 1e9 : null,
-          price: q.regularMarketPrice
+          price: q.regularMarketPrice ?? null
         };
         success++;
       });

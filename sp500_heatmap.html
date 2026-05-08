@@ -620,7 +620,7 @@ async function loadLiveData() {
   status.textContent = '📡 데이터를 가져오는 중...';
 
   try {
-    // 1순위: 같은 도메인 JSON (GitHub Actions로 매시간 갱신)
+    // 1순위: 같은 도메인 JSON (매시간 자동 갱신)
     let liveData = null;
     let source = '';
     try {
@@ -632,13 +632,14 @@ async function loadLiveData() {
       }
     } catch(e) {}
 
-    // 2순위: 직접 Yahoo Finance v8 spark API (CORS 허용 시)
+    // 2순위: Yahoo Finance v8 직접 호출
     if (!liveData) {
       const BATCH = 20;
       const tmpCache = {};
       let ok = 0;
-      for (let i = 0; i < tickers.length; i += BATCH) {
-        const batch = tickers.slice(i, i + BATCH);
+      const syms = data.map(d => d.ticker);
+      for (let i = 0; i < syms.length; i += BATCH) {
+        const batch = syms.slice(i, i + BATCH);
         const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${batch.join(',')}&range=1d&interval=1d`;
         try {
           const resp = await fetch(url);
@@ -654,19 +655,17 @@ async function loadLiveData() {
             }
           }
         } catch(e) {}
-        if (i + BATCH < tickers.length) await new Promise(r => setTimeout(r, 300));
+        if (i + BATCH < syms.length) await new Promise(r => setTimeout(r, 300));
       }
       if (ok > 0) { liveData = tmpCache; source = 'Yahoo Finance 실시간'; }
     }
 
     if (!liveData || Object.keys(liveData).length === 0) throw new Error('데이터를 가져올 수 없습니다');
 
-    // data 업데이트
     data.forEach(d => {
-      const yt = toYahoo(d.ticker);
-      const live = liveData[yt];
+      const live = liveData[d.ticker];
       if (live) {
-        if (live.chg  != null) d.chg   = live.chg;
+        if (live.chg   != null) d.chg   = live.chg;
         if (live.price != null) d.price = live.price;
       }
     });

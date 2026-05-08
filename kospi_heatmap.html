@@ -149,9 +149,10 @@ const kospiRaw = [
 const r1 = seededRand(20250501);
 const kospiData = kospiRaw.map(([t,n,s,c]) => ({
   ticker: t, name: n, sector: s,
-  cap: c,
-  capKRW: c,
-  chg: parseFloat((r1()*4.5 - 0.3).toFixed(2))
+  cap: c,          // 조원 단위 (트리맵 크기 비교용)
+  capKRW: c,       // 조원 단위 (툴팁 표시용)
+  chg: parseFloat((r1()*4.5 - 0.3).toFixed(2)),
+  price: null
 }));
 
 const sectorColorMap = {
@@ -232,6 +233,7 @@ function renderChart() {
         <table>
           <tr><td>섹터</td><td>${d.data.sector}</td></tr>
           <tr><td>시가총액</td><td>~₩${d.data.capKRW.toFixed(0)}조원</td></tr>
+          <tr><td>현재가</td><td>${d.data.price != null ? '₩' + d.data.price.toLocaleString() : '—'}</td></tr>
           <tr><td>등락률</td><td class="${cls}" style="font-weight:700">${sign}${d.data.chg}%</td></tr>
         </table>
         <div style="margin-top:8px;font-size:0.75em;color:#556;text-align:center;">🔗 클릭 → Yahoo Finance</div>`;
@@ -288,7 +290,22 @@ async function loadLiveData() {
   status.className = 'live-status';
   status.textContent = '📡 Yahoo Finance에서 시세를 가져오는 중...';
 
-  const PROXY = 'https://corsproxy.io/?';
+  const PROXIES = [
+    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
+    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    u => 'https://thingproxy.freeboard.io/fetch/' + u,
+  ];
+  async function fetchJSON(apiUrl) {
+    let lastErr;
+    for (const mkProxy of PROXIES) {
+      try {
+        const resp = await fetch(mkProxy(apiUrl), { headers: { 'Accept': 'application/json' } });
+        if (resp.ok) return await resp.json();
+        lastErr = new Error('HTTP ' + resp.status);
+      } catch(e) { lastErr = e; }
+    }
+    throw lastErr || new Error('모든 프록시 실패');
+  }
   const tickers = kospiData.map(d => d.ticker.padStart(6,'0') + '.KS');
   const liveCache = {};
   let success = 0;
@@ -296,12 +313,10 @@ async function loadLiveData() {
   try {
     for (let i = 0; i < tickers.length; i += 80) {
       const batch = tickers.slice(i, i+80);
-      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketChangePercent,marketCap`;
-      const resp = await fetch(PROXY + encodeURIComponent(url), { headers: { 'Accept': 'application/json' } });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketChangePercent,marketCap,regularMarketPrice`;
+      const json = await fetchJSON(url);
       (json.quoteResponse?.result || []).forEach(q => {
-        liveCache[q.symbol] = { chg: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)), cap: q.marketCap };
+        liveCache[q.symbol] = { chg: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)), cap: q.marketCap, price: q.regularMarketPrice ?? null };
         success++;
       });
       if (i+80 < tickers.length) await new Promise(r => setTimeout(r, 400));
@@ -311,9 +326,10 @@ async function loadLiveData() {
       if (liveCache[sym]) {
         d.chg = liveCache[sym].chg;
         if (liveCache[sym].cap) {
-          d.capKRW = liveCache[sym].cap / 1e12;
+          d.capKRW = liveCache[sym].cap / 1e12;  // KRW → 조원
           d.cap = d.capKRW;
         }
+        if (liveCache[sym].price != null) d.price = liveCache[sym].price;
       }
     });
     renderChart();

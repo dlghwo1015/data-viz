@@ -354,18 +354,49 @@ function renderChart() {
     g.append('clipPath').attr('id',cid).append('rect').attr('width',w).attr('height',h);
 
     if (w >= 35 && h >= 26) {
-      g.append('text').attr('x',w/2).attr('y', h>=38 ? cy-6 : cy)
+      const showName = h >= 40 && w >= 48;
+      const showChg  = h >= 52 && showName;
+
+      // ticker Y position
+      const tickerY = showChg ? cy-11 : (showName ? cy-7 : cy);
+
+      g.append('text').attr('x',w/2).attr('y', tickerY)
         .attr('text-anchor','middle').attr('dominant-baseline','middle')
         .attr('font-size',fs).attr('font-weight','700').attr('fill','rgba(255,255,255,0.95)')
         .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
         .text(d.data.ticker);
-      if (h >= 38) {
+
+      if (showName) {
+        // truncate company name to fit cell width
+        const maxChars = Math.max(4, Math.floor(w / 6.5));
+        const nameStr = d.data.name.length > maxChars
+          ? d.data.name.slice(0, maxChars - 1) + '…'
+          : d.data.name;
+        const nameY = showChg ? cy : cy + 7;
+        g.append('text').attr('x',w/2).attr('y', nameY)
+          .attr('text-anchor','middle').attr('dominant-baseline','middle')
+          .attr('font-size', Math.min(fs * 0.70, 9)).attr('fill','rgba(255,255,255,0.78)')
+          .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
+          .text(nameStr);
+      }
+
+      if (showChg) {
         const sign = d.data.chg >= 0 ? '+' : '';
-        g.append('text').attr('x',w/2).attr('y',cy+7)
+        g.append('text').attr('x',w/2).attr('y', cy+11)
           .attr('text-anchor','middle').attr('dominant-baseline','middle')
           .attr('font-size', Math.min(fs*0.78,10)).attr('fill','rgba(255,255,255,0.72)')
           .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
           .text(`${sign}${d.data.chg}%`);
+      } else if (!showName) {
+        // medium cell: no name, just ticker + change% if h allows
+        if (h >= 38) {
+          const sign = d.data.chg >= 0 ? '+' : '';
+          g.append('text').attr('x',w/2).attr('y', cy+7)
+            .attr('text-anchor','middle').attr('dominant-baseline','middle')
+            .attr('font-size', Math.min(fs*0.78,10)).attr('fill','rgba(255,255,255,0.72)')
+            .attr('pointer-events','none').attr('clip-path',`url(#${cid})`).attr('filter','url(#tshadow)')
+            .text(`${sign}${d.data.chg}%`);
+        }
       }
     } else {
       g.append('text').attr('x',w/2).attr('y',cy)
@@ -401,7 +432,7 @@ async function loadLiveData() {
       const BATCH = 20;
       const tmpCache = {};
       let ok = 0;
-      const syms = nikkeiData.map(d => d.ticker);
+      const syms = nikkeiData.map(d => d.ticker + '.T');
       for (let i = 0; i < syms.length; i += BATCH) {
         const batch = syms.slice(i, i + BATCH);
         const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${batch.join(',')}&range=1d&interval=1d`;
@@ -427,7 +458,7 @@ async function loadLiveData() {
     if (!liveData || Object.keys(liveData).length === 0) throw new Error('데이터를 가져올 수 없습니다');
 
     nikkeiData.forEach(d => {
-      const live = liveData[d.ticker];
+      const live = liveData[d.ticker + '.T'] || liveData[d.ticker];
       if (live) {
         if (live.chg   != null) d.chg   = live.chg;
         if (live.price != null) d.price = live.price;

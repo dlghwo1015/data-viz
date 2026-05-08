@@ -394,7 +394,8 @@ async function loadLiveData() {
       if (r.ok) {
         const j = await r.json();
         const ageMin = (Date.now()/1000 - j.ts) / 60;
-        if (ageMin < 90) { liveData = j.data; source = `캐시 (${Math.round(ageMin)}분 전)`; }
+        liveData = j.data;
+        source = ageMin < 90 ? `캐시 (${Math.round(ageMin)}분 전)` : `오래된 데이터 (${Math.round(ageMin)}분 전) ⚠️`;
       }
     } catch(e) {}
 

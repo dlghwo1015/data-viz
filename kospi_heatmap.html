@@ -425,7 +425,7 @@ async function loadLiveData() {
 
     if (!liveData || Object.keys(liveData).length === 0) throw new Error('데이터를 가져올 수 없습니다');
 
-    data.forEach(d => {
+    kospiData.forEach(d => {
       const live = liveData[d.symbol];
       if (live) {
         if (live.chg   != null) d.chg   = live.chg;

@@ -8,9 +8,9 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; padding: 10px 16px; }
-h1 { text-align: center; font-size: 1.5em; color: #c0c0e0; letter-spacing: 2px; font-weight: 300; margin-bottom: 4px; }
-.meta { text-align: center; font-size: 0.72em; color: #555; margin-bottom: 6px; }
-.meta span { color: #888; }
+h1 { text-align: center; font-size: 1.5em; color: var(--h1-color); letter-spacing: 2px; font-weight: 300; margin-bottom: 4px; }
+.meta { text-align: center; font-size: 0.72em; color: var(--meta-color); margin-bottom: 6px; }
+.meta span { color: var(--meta-span); }
 
 /* Controls */
 .controls { display: flex; justify-content: center; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
@@ -26,7 +26,7 @@ h1 { text-align: center; font-size: 1.5em; color: #c0c0e0; letter-spacing: 2px; 
 .api-info a { color: #558; text-decoration: none; }
 
 /* Legend */
-.legend { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 5px; font-size: 0.7em; color: #888; }
+.legend { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 5px; font-size: 0.7em; color: var(--legend-color); }
 .grad-bar { width: 200px; height: 12px; border-radius: 6px; background: linear-gradient(to right, #ff5050, #aa1a1a, #2a2a38, #0d7530, #26e870); }
 .leg-label { color: #777; }
 
@@ -104,10 +104,10 @@ body.light {
   --stock-pct: rgba(0,0,0,0.65);
   --stat-lbl: #888;
   --api-color: #aaa;
-  --meta-color: #aaa;
-  --meta-span: #777;
-  --legend-color: #777;
-  --leg-label: #888;
+  --meta-color: #444;
+  --meta-span: #444;
+  --legend-color: #555;
+  --leg-label: #555;
 }
 /* Theme toggle button */
 #theme-toggle {
@@ -119,6 +119,10 @@ body.light {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 #theme-toggle:hover { background: var(--bg3); }
+body.light .btn { background: #f0f0ff; border-color: #3355aa; color: #2244aa; }
+body.light .btn.active { background: #dde8ff; }
+body.light .live-btn { background: #fff0f0; border-color: #cc3333; color: #aa1111; }
+body.light .live-btn:hover:not(:disabled) { background: #ffe0e0; border-color: #ff4444; }
 
 </style>
 </head>
@@ -471,7 +475,7 @@ function render() {
   const container = document.getElementById('chart');
   container.innerHTML = '';
   const W = container.clientWidth || window.innerWidth - 32;
-  const H = Math.max(520, window.innerHeight - 200);
+  const headerH = document.getElementById('chart').getBoundingClientRect().top; const H = Math.max(460, window.innerHeight - headerH - 14);
 
   const grouped = {};
   sectorOrder.forEach(s => { grouped[s] = []; });

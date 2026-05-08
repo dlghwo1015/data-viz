@@ -377,60 +377,67 @@ function renderChart() {
 }
 
 async function loadLiveData() {
-  const btn = document.getElementById('live-btn');
+  const btn    = document.getElementById('live-btn');
   const status = document.getElementById('live-status');
-  btn.textContent = '⏳ 로딩 중...'; btn.disabled = true;
+  btn.disabled = true;
+  btn.textContent = '🔃 로딩 중...';
   status.className = 'live-status';
-  status.textContent = '📡 Yahoo Finance에서 시세를 가져오는 중...';
-
-  const PROXIES = [
-    u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
-    u => 'https://corsproxy.io/?' + encodeURIComponent(u),
-    u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-    u => 'https://thingproxy.freeboard.io/fetch/' + u,
-    u => 'https://cors-anywhere.herokuapp.com/' + u,
-  ];
-  async function fetchJSON(apiUrl) {
-    let lastErr;
-    for (const mkProxy of PROXIES) {
-      try {
-        const resp = await fetch(mkProxy(apiUrl), { headers: { 'Accept': 'application/json' } });
-        if (resp.ok) return await resp.json();
-        lastErr = new Error('HTTP ' + resp.status);
-      } catch(e) { lastErr = e; }
-    }
-    throw lastErr || new Error('모든 프록시 실패');
-  }
-  const tickers = kospiData.map(d => d.ticker.padStart(6,'0') + '.KS');
-  const liveCache = {};
-  let success = 0;
+  status.textContent = '📡 데이터를 가져오는 중...';
 
   try {
-    for (let i = 0; i < tickers.length; i += 80) {
-      const batch = tickers.slice(i, i+80);
-      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketChangePercent,marketCap,regularMarketPrice`;
-      const json = await fetchJSON(url);
-      (json.quoteResponse?.result || []).forEach(q => {
-        liveCache[q.symbol] = { chg: parseFloat((q.regularMarketChangePercent ?? 0).toFixed(2)), cap: q.marketCap, price: q.regularMarketPrice ?? null };
-        success++;
-      });
-      if (i+80 < tickers.length) await new Promise(r => setTimeout(r, 400));
+    let liveData = null;
+    let source = '';
+    try {
+      const r = await fetch('kospi_live.json?_=' + Date.now());
+      if (r.ok) {
+        const j = await r.json();
+        const ageMin = (Date.now()/1000 - j.ts) / 60;
+        if (ageMin < 90) { liveData = j.data; source = `캐시 (${Math.round(ageMin)}분 전)`; }
+      }
+    } catch(e) {}
+
+    if (!liveData) {
+      const BATCH = 20;
+      const tmpCache = {};
+      let ok = 0;
+      const syms = kospiData.map(d => d.symbol);
+      for (let i = 0; i < syms.length; i += BATCH) {
+        const batch = syms.slice(i, i + BATCH);
+        const url = `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${batch.join(',')}&range=1d&interval=1d`;
+        try {
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const j = await resp.json();
+            for (const [sym, info] of Object.entries(j)) {
+              const closes = info.close || [];
+              const price = closes[closes.length - 1] ?? null;
+              const prev  = info.chartPreviousClose ?? null;
+              const chg   = (price && prev) ? parseFloat(((price-prev)/prev*100).toFixed(2)) : null;
+              tmpCache[sym] = { price, chg };
+              ok++;
+            }
+          }
+        } catch(e) {}
+        if (i + BATCH < syms.length) await new Promise(r => setTimeout(r, 300));
+      }
+      if (ok > 0) { liveData = tmpCache; source = 'Yahoo Finance 실시간'; }
     }
-    kospiData.forEach((d, i) => {
-      const sym = tickers[i];
-      if (liveCache[sym]) {
-        d.chg = liveCache[sym].chg;
-        if (liveCache[sym].cap) {
-          d.capKRW = liveCache[sym].cap / 1e12;  // KRW → 조원
-          d.cap = d.capKRW;
-        }
-        if (liveCache[sym].price != null) d.price = liveCache[sym].price;
+
+    if (!liveData || Object.keys(liveData).length === 0) throw new Error('데이터를 가져올 수 없습니다');
+
+    data.forEach(d => {
+      const live = liveData[d.symbol];
+      if (live) {
+        if (live.chg   != null) d.chg   = live.chg;
+        if (live.price != null) d.price = live.price;
+
       }
     });
-    renderChart();
+
+    render();
     const now = new Date().toLocaleTimeString('ko-KR');
     status.className = 'live-status ok';
-    status.textContent = `✅ ${now} 기준 실시간 데이터 (${success}개 종목) · Yahoo Finance`;
+    status.textContent = `✅ ${now} 기준 (${source}) · ${Object.keys(liveData).length}개 종목`;
     btn.textContent = '🔄 새로고침';
   } catch (err) {
     status.className = 'live-status err';
